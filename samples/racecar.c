@@ -163,7 +163,8 @@ void display(kuhl_geometry* car)
 			/* Calculate an angle to rotate the object. glfwGetTime() gets
 			* the time in seconds since GLFW was initialized. Rotates 45 degrees every second. */
 			w_angle = fmod((glfwGetTime()-m_start_time)*60, 360);
-			w_lst_angle = fmod(m_start_angle + w_angle,360);
+			w_angle = fmod(m_start_angle + w_angle,360);
+			w_lst_angle = w_angle;
 		}else{
 			w_angle = w_lst_angle;
 		}
@@ -242,7 +243,7 @@ void display(kuhl_geometry* car)
 				kuhl_errorcheck();
 				/* Set the uniform variable in the shader that is named "red" to the value 1. */
 				glUniform1i(kuhl_get_uniform("red"),1);
-				glUniform1i(kuhl_get_uniform("green"), 0);
+				//glUniform1i(kuhl_get_uniform("green"), 0);
 				kuhl_errorcheck();
 				/* Good practice: Unbind objects until we really need them. */
 				glUseProgram(0);
@@ -253,7 +254,7 @@ void display(kuhl_geometry* car)
 				kuhl_errorcheck();
 				/* Set the uniform variable in the shader that is named "red" to the value 1. */
 				glUniform1i(kuhl_get_uniform("red"),0);
-				glUniform1i(kuhl_get_uniform("green"), 1);
+				//glUniform1i(kuhl_get_uniform("green"), 1);
 				kuhl_errorcheck();
 				/* Good practice: Unbind objects until we really need them. */
 				glUseProgram(0);
