@@ -18,13 +18,40 @@
 #include <GLFW/glfw3.h>
 
 static GLuint program = 0; /**< id value for the GLSL program */
+static GLuint duckProg = 0;
 static kuhl_geometry* quads;
 static float** t_matrix;
 static int num_images;
 static float pi = 3.141529;
 static float* angles;
 static float std_angle;
+static float rotate = 1;
+static float sv_angle = 0;
+static kuhl_geometry* duck;
 
+void calcOrder(int* output, float angle){
+	int temp = (int)((angle + .7 * std_angle) / std_angle);
+	int la=360,ra=720;
+	la -= temp * std_angle;
+	ra -= temp * std_angle;
+	int i = 0;
+	output[i] = (la%360) / std_angle;
+	while (la <= ra){
+		i+=1;
+		if(i > num_images){
+			printf("ERROR: INDEX OUT OF BOUNDS EXCEPTION");
+			exit(1);
+		}
+		la += std_angle;
+		ra -= std_angle;
+		if(la == ra){
+			output[i] = (la % 360) / std_angle;
+		}else{
+			output[i] = (la % 360) / std_angle;
+			output[++i] = (ra % 360) / std_angle;
+		}
+	}
+}
 
 /* Called by GLFW whenever a key is pressed. */
 void keyboard(GLFWwindow* window, int key, int scancode, int action, int mods)
@@ -38,6 +65,11 @@ void keyboard(GLFWwindow* window, int key, int scancode, int action, int mods)
 		case GLFW_KEY_ESCAPE:
 			glfwSetWindowShouldClose(window, GL_TRUE);
 			break;
+		case GLFW_KEY_SPACE:
+			if(rotate == 0)
+				rotate = 1;
+			else
+				rotate = 0;
 	}
 }
 
@@ -88,18 +120,50 @@ void display()
 
 		/* Calculate an angle to rotate the object. glfwGetTime() gets
 		 * the time in seconds since GLFW was initialized. Rotates 45 degrees every second. */
-		//float angle = fmod(glfwGetTime()*45, 360);
 		float angle = 0;
+		if(rotate == 1){
+			angle = fmod(glfwGetTime()*45, 360);
+			sv_angle = angle;
+		}else{
+			angle = sv_angle;
+		}
+		
+		//get the order to draw the faces
+		int order[num_images];
+		calcOrder(order, angle);
+		//float angle = 0;
 		/* Create a scale matrix. */
 		float scaleMatrix[16];
 		mat4f_scale_new(scaleMatrix, 3, 3, 3);
+
+
+		//draw the duck
+		float model[16] = { 1,0,0,0,0,1,0,0,0,0,1,0,-.081,-.525,.022,1};
+		glUseProgram(duckProg);
+		float mv[16];
+		mat4f_mult_mat4f_new(mv,viewMat,model);
+		kuhl_errorcheck();
+		
+		/* Send the perspective projection matrix to the vertex program. */
+		glUniformMatrix4fv(kuhl_get_uniform("Projection"),
+						1, // number of 4x4 float matrices
+						0, // transpose
+						perspective); // value
+		/* Send the modelview matrix to the vertex program. */
+		glUniformMatrix4fv(kuhl_get_uniform("ModelView"),
+						1, // number of 4x4 float matrices
+						0, // transpose
+						mv); // value
+		kuhl_errorcheck();
+		kuhl_geometry_draw(duck);
+		glUseProgram(0);
+		//draw the pict
 		
 		for (int i = 0; i < num_images; i+=1){
-			int rot = (int)angle / (int)std_angle;
-			int index = (i + rot)%num_images;
+			int index = order[i];
+			
 			float rotMat[16];
 			float t_angle = angle + angles[index];
-
 			t_angle = fmod(t_angle,360);
 			mat4f_rotateAxis_new(rotMat, t_angle, 0, 1, 0);
 			// Modelview = (viewMatrix * scaleMatrix) * rotationMatrix
@@ -229,6 +293,7 @@ int main(int argc, char** argv){
 	/* Compile and link a GLSL program composed of a vertex shader and
 	 * a fragment shader. */
 	program = kuhl_create_program("carousel.vert", "carousel.frag");
+	duckProg = kuhl_create_program("carousel_model.vert", "carousel_model.frag");
 	
 	kuhl_errorcheck();
 
@@ -245,34 +310,22 @@ int main(int argc, char** argv){
 	std_angle = 360/num_images;
 
 	glUseProgram(program);
-	for (int j = 0; j < num_images/2; j+=1){		
-		int h = (num_images-1)-j;
-		int l = j;
-		init_geometryQuad(&quads[2*j], program, images[l]);
-		mat4f_translate_new(t_matrix[2*j],0,-3,-4);
-		angles[j] = std_angle * l;
-		init_geometryQuad(&quads[2*j+1], program, images[h]);
-		mat4f_translate_new(t_matrix[2*j+1],0,-3,-4);
-		angles[2*j+1] = std_angle * h;
-
-		printf("%d  %d  ",l,h);
-	}
-	if(num_images%2 == 1){
-		int i = num_images/2;
-		printf("%d",i);
-		init_geometryQuad(&quads[num_images-1], program, images[i]);
-		mat4f_translate_new(t_matrix[num_images-1],0,-3,-3);
-		angles[num_images-1] = std_angle * i;
-	}
-	printf("\n");
-
-	for(int i = 0; i < num_images; i++){
-		printf("ANGLE:  %d   %f\n", i, angles[i]);
+	for (int j = 0; j < num_images; j+=1){		
+		init_geometryQuad(&quads[j], program, images[j]);
+		mat4f_translate_new(t_matrix[j],0,-3,-4);
+		angles[j] = std_angle * j;
+		init_geometryQuad(&quads[j], program, images[j]);
+		mat4f_translate_new(t_matrix[j],0,-1,-4);
+		angles[j] = std_angle * j;
 	}
 	/* Good practice: Unbind objects until we really need them. */
 	glUseProgram(0);
 	printf("Quads made\n");
-	
+	kuhl_errorcheck();
+	printf("Making The Duck\n");
+	glUseProgram(duckProg);
+	duck = kuhl_load_model("../models/duck/duck.dae", NULL, duckProg, NULL);
+	glUseProgram(0);
 	
 
 	dgr_init();     /* Initialize DGR based on environment variables. */
