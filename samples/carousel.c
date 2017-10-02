@@ -101,9 +101,6 @@ void display()
 			float t_angle = angle + angles[index];
 
 			t_angle = fmod(t_angle,360);
-			if(t_angle == 0){
-				printf(".");
-			}
 			mat4f_rotateAxis_new(rotMat, t_angle, 0, 1, 0);
 			// Modelview = (viewMatrix * scaleMatrix) * rotationMatrix
 			float modelview[16];
@@ -237,11 +234,14 @@ int main(int argc, char** argv){
 	kuhl_errorcheck();
 
 	t_matrix = (float**)malloc(sizeof(float*) * (num_images));
-	for(int i = 0; i < num_images; i++)
+	for(int i = 0; i < num_images; i++){
 		t_matrix[i] = (float*)malloc(sizeof(float)*16);
+	}
 	printf("Translations Malloced\n");
 	quads = (kuhl_geometry*)malloc(sizeof(kuhl_geometry) * (num_images));
 	angles = (float*)malloc(sizeof(float) * (num_images));
+	for (int i = 0; i < num_images; i++)
+		angles[i] = 0;
 	printf("Quads Malloced\n");
 	std_angle = 360/num_images;
 
