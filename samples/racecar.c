@@ -719,7 +719,7 @@ int main(int argc, char** argv)
 
 	/* Compile and link a GLSL program composed of a vertex shader and
 	 * a fragment shader. */
-	program = kuhl_create_program("triangle-shade.vert", "triangle-shade.frag");
+	program = kuhl_create_program("racecar.vert", "racecar.frag");
 
 	/* Use the GLSL program so subsequent calls to glUniform*() send the variable to
 	   the correct program. */

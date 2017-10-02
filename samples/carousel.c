@@ -3,8 +3,9 @@
  * the file named "LICENSE" for a full copy of the license.
  */
 
-/** @file Demonstrates drawing textured geometry.
+/** @file Demonstrates drawing textured geometry by making a carousel
  *
+ * @author Dane Jensen
  * @author Scott Kuhl
  */
 
@@ -17,7 +18,9 @@
 #include <GLFW/glfw3.h>
 
 static GLuint program = 0; /**< id value for the GLSL program */
-static kuhl_geometry triangle;
+static kuhl_geometry* quads;
+static float** t_matrix;
+static int num_images;
 
 
 /* Called by GLFW whenever a key is pressed. */
@@ -42,6 +45,7 @@ void display()
 	 * viewport will fill the entire screen. However, this loop will
 	 * run twice for HMDs (once for the left eye and once for the
 	 * right). */
+	
 	viewmat_begin_frame();
 	for(int viewportID=0; viewportID<viewmat_num_viewports(); viewportID++)
 	{
@@ -66,6 +70,7 @@ void display()
 		glEnable(GL_DEPTH_TEST); // turn on depth testing
 		kuhl_errorcheck();
 
+		
 		/* Turn on blending (note, if you are using transparent textures,
 		   the transparency may not look correct unless you draw further
 		   items before closer items. This program always draws the
@@ -73,52 +78,49 @@ void display()
 		glEnable(GL_BLEND);
 		glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
 		glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO);
-
+			
 		/* Get the view or camera matrix; update the frustum values if needed. */
 		float viewMat[16], perspective[16];
 		viewmat_get(viewMat, perspective, viewportID);
 
 		/* Calculate an angle to rotate the object. glfwGetTime() gets
 		 * the time in seconds since GLFW was initialized. Rotates 45 degrees every second. */
-		float angle = fmod(glfwGetTime()*45, 360);
-
-		/* Make sure all computers/processes use the same angle */
-		dgr_setget("angle", &angle, sizeof(GLfloat));
-		/* Create a 4x4 rotation matrix based on the angle we computed. */
-		float rotateMat[16];
-		mat4f_rotateAxis_new(rotateMat, angle, 0,1,0);
+		//float angle = fmod(glfwGetTime()*45, 360);
 
 		/* Create a scale matrix. */
 		float scaleMatrix[16];
 		mat4f_scale_new(scaleMatrix, 3, 3, 3);
 
-		// Modelview = (viewMatrix * scaleMatrix) * rotationMatrix
-		float modelview[16];
-		mat4f_mult_mat4f_new(modelview, viewMat, scaleMatrix);
-		mat4f_mult_mat4f_new(modelview, modelview, rotateMat);
+		for (int i = 0; i <num_images; i++){
+			
+			// Modelview = (viewMatrix * scaleMatrix) * rotationMatrix
+			float modelview[16];
+			mat4f_mult_mat4f_new(modelview, scaleMatrix, t_matrix[i] );
+			mat4f_mult_mat4f_new(modelview, viewMat, modelview);
+			
+			/* Tell OpenGL which GLSL program the subsequent
+			* glUniformMatrix4fv() calls are for. */
+			kuhl_errorcheck();			
+			glUseProgram(program);
+			kuhl_errorcheck();
+			
+			/* Send the perspective projection matrix to the vertex program. */
+			glUniformMatrix4fv(kuhl_get_uniform("Projection"),
+							1, // number of 4x4 float matrices
+							0, // transpose
+							perspective); // value
+			/* Send the modelview matrix to the vertex program. */
+			glUniformMatrix4fv(kuhl_get_uniform("ModelView"),
+							1, // number of 4x4 float matrices
+							0, // transpose
+							modelview); // value
+			kuhl_errorcheck();
+			/* Draw the geometry using the matrices that we sent to the
+			* vertex programs immediately above */
+			kuhl_geometry_draw(&quads[i]);
 
-		/* Tell OpenGL which GLSL program the subsequent
-		 * glUniformMatrix4fv() calls are for. */
-		kuhl_errorcheck();
-		glUseProgram(program);
-		kuhl_errorcheck();
-		
-		/* Send the perspective projection matrix to the vertex program. */
-		glUniformMatrix4fv(kuhl_get_uniform("Projection"),
-		                   1, // number of 4x4 float matrices
-		                   0, // transpose
-		                   perspective); // value
-		/* Send the modelview matrix to the vertex program. */
-		glUniformMatrix4fv(kuhl_get_uniform("ModelView"),
-		                   1, // number of 4x4 float matrices
-		                   0, // transpose
-		                   modelview); // value
-		kuhl_errorcheck();
-		/* Draw the geometry using the matrices that we sent to the
-		 * vertex programs immediately above */
-		kuhl_geometry_draw(&triangle);
-
-		glUseProgram(0); // stop using a GLSL program.
+			//glUseProgram(0); // stop using a GLSL program.
+		}
 		viewmat_end_eye(viewportID);
 	} // finish viewport loop
 	viewmat_end_frame();
@@ -129,52 +131,109 @@ void display()
 
 }
 
-void init_geometryTriangle(kuhl_geometry *geom, GLuint prog)
-{
-	kuhl_geometry_new(geom, prog, 3, GL_TRIANGLES);
-
+void init_geometryQuad(kuhl_geometry *geom, GLuint prog, char* filename){
+	kuhl_geometry_new(geom, prog, 4, GL_TRIANGLES);
+	printf("Making a quad\n");
+	kuhl_errorcheck();
 	GLfloat texcoordData[] = {0, 0,
 	                          1, 0,
-	                          1, 1 };
+							  1, 1,
+							  0, 1 };
 	kuhl_geometry_attrib(geom, texcoordData, 2, "in_TexCoord", KG_WARN);
+	kuhl_errorcheck();
 	// The 2 parameter above means each texture coordinate is a 2D coordinate.
-
-
+	
+	/* Load the texture. It will be bound to texId */	
+	printf("loading a texture: %s\n",filename);
+	GLuint texId = 0;
+	float ratio = kuhl_read_texture_file(filename, &texId);
+	printf("Quad Aspect Ratio: %f\n", ratio);
 	/* The data that we want to draw */
-	GLfloat vertexData[] = {0, 0, 0,
-	                        1, 0, 0,
-	                        1, 1, 0};
+
+	float xratio,yratio = 1;
+	if(ratio < 1){
+		xratio = ratio;
+		yratio = 1;
+	}else{
+		xratio = 1;
+		yratio = 1/ratio;
+	}
+
+	printf("XRATIO: %.3f, YRATIO: %.3f\n",xratio,yratio);
+
+	GLfloat vertexData[16] = {	0 * xratio, 0 * yratio, 0,
+								1 * xratio, 0 * yratio, 0,
+								1 * xratio, 1 * yratio, 0,
+								0 * xratio, 1 * yratio, 0};
+
 	kuhl_geometry_attrib(geom, vertexData, 3, "in_Position", KG_WARN);
+	kuhl_errorcheck();
 	// The 3 parameter above means that each vertex position is a 3D coordinate.
 
-	/* Load the texture. It will be bound to texId */	
-	GLuint texId = 0;
-	kuhl_read_texture_file("../images/rainbow.png", &texId);
+	
+	
 	/* Tell this piece of geometry to use the texture we just loaded. */
 	kuhl_geometry_texture(geom, texId, "tex", KG_WARN);
+	kuhl_errorcheck();
+
+	GLuint indexData[] = {
+		0,1,2,
+		0,3,2
+	};
+	kuhl_geometry_indices(geom, indexData, 6);
 
 	kuhl_errorcheck();
+	printf("Finished a quad\n");
 }
 
-int main(int argc, char** argv)
-{
+int main(int argc, char** argv){
 	/* Initialize GLFW and GLEW */
+	
 	kuhl_ogl_init(&argc, argv, 512, 512, 32, 4);
-
+	char** images;
+	num_images = 0;
+	char def[] = "../images/kitten.jpg";
+	if(argc < 2){
+		printf("Usage: ./carousel <img 1> <img 2>...\n");
+		images = malloc(sizeof(char*));
+		images[0] = &def;
+		printf("Setting default image: %s\n", def);
+		num_images = 1;
+	}else{
+		images = (char**)malloc(sizeof(char*) * (argc-1));
+		for (int i = 1; i < argc; i++){
+			images[i-1] = argv[i];
+		}
+		num_images = argc-1;
+	}
+	
 	/* Specify function to call when keys are pressed. */
 	glfwSetKeyCallback(kuhl_get_window(), keyboard);
 	// glfwSetFramebufferSizeCallback(window, reshape);
 
 	/* Compile and link a GLSL program composed of a vertex shader and
 	 * a fragment shader. */
-	program = kuhl_create_program("texture.vert", "texture.frag");
-	glUseProgram(program);
+	program = kuhl_create_program("carousel.vert", "carousel.frag");
+	
 	kuhl_errorcheck();
 
-	init_geometryTriangle(&triangle, program);
-	
+	t_matrix = (float**)malloc(sizeof(float*) * (num_images));
+	printf("Translations Malloced\n");
+	quads = (kuhl_geometry*)malloc(sizeof(kuhl_geometry) * (num_images));
+	printf("Quads Malloced\n");
+
+	glUseProgram(program);
+	for (int i = 0; i < num_images; i++){
+		init_geometryQuad(&quads[i], program, images[i]);
+		t_matrix[i] = (float*)malloc(sizeof(float) * 16);
+		mat4f_translate_new(t_matrix[i],1.1 * (i),0,0);
+	}
+
 	/* Good practice: Unbind objects until we really need them. */
 	glUseProgram(0);
+	printf("Quads made\n");
+	
+	
 
 	dgr_init();     /* Initialize DGR based on environment variables. */
 
@@ -191,6 +250,13 @@ int main(int argc, char** argv)
 		/* process events (keyboard, mouse, etc) */
 		glfwPollEvents();
 	}
+
+	free(quads);
+	for (int i = 0; i < num_images;i++){
+		free(t_matrix[i]);
+	}
+	free(t_matrix);
+	free(images);
 
 	exit(EXIT_SUCCESS);
 }
