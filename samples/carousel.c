@@ -134,7 +134,6 @@ void display()
 		}
 		viewmat_end_eye(viewportID);
 	} // finish viewport loop
-	printf("\n");
 	viewmat_end_frame();
 
 	/* Check for errors. If there are errors, consider adding more
