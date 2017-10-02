@@ -21,6 +21,9 @@ static GLuint program = 0; /**< id value for the GLSL program */
 static kuhl_geometry* quads;
 static float** t_matrix;
 static int num_images;
+static float pi = 3.141529;
+static float* angles;
+static float std_angle;
 
 
 /* Called by GLFW whenever a key is pressed. */
@@ -86,16 +89,27 @@ void display()
 		/* Calculate an angle to rotate the object. glfwGetTime() gets
 		 * the time in seconds since GLFW was initialized. Rotates 45 degrees every second. */
 		//float angle = fmod(glfwGetTime()*45, 360);
-
+		float angle = 0;
 		/* Create a scale matrix. */
 		float scaleMatrix[16];
 		mat4f_scale_new(scaleMatrix, 3, 3, 3);
+		
+		for (int i = 0; i < num_images; i+=1){
+			int rot = (int)angle / (int)std_angle;
+			int index = (i + rot)%num_images;
+			float rotMat[16];
+			float t_angle = angle + angles[index];
 
-		for (int i = 0; i <num_images; i++){
-			
+			t_angle = fmod(t_angle,360);
+			if(t_angle == 0){
+				printf(".");
+			}
+			mat4f_rotateAxis_new(rotMat, t_angle, 0, 1, 0);
 			// Modelview = (viewMatrix * scaleMatrix) * rotationMatrix
 			float modelview[16];
-			mat4f_mult_mat4f_new(modelview, scaleMatrix, t_matrix[i] );
+			mat4f_mult_mat4f_new(modelview, t_matrix[index], scaleMatrix );
+			mat4f_mult_mat4f_new(modelview, rotMat,  modelview);
+			
 			mat4f_mult_mat4f_new(modelview, viewMat, modelview);
 			
 			/* Tell OpenGL which GLSL program the subsequent
@@ -117,12 +131,13 @@ void display()
 			kuhl_errorcheck();
 			/* Draw the geometry using the matrices that we sent to the
 			* vertex programs immediately above */
-			kuhl_geometry_draw(&quads[i]);
+			kuhl_geometry_draw(&quads[index]);
 
 			//glUseProgram(0); // stop using a GLSL program.
 		}
 		viewmat_end_eye(viewportID);
 	} // finish viewport loop
+	printf("\n");
 	viewmat_end_frame();
 
 	/* Check for errors. If there are errors, consider adding more
@@ -133,7 +148,7 @@ void display()
 
 void init_geometryQuad(kuhl_geometry *geom, GLuint prog, char* filename){
 	kuhl_geometry_new(geom, prog, 4, GL_TRIANGLES);
-	printf("Making a quad\n");
+	//printf("Making a quad\n");
 	kuhl_errorcheck();
 	GLfloat texcoordData[] = {0, 0,
 	                          1, 0,
@@ -144,27 +159,31 @@ void init_geometryQuad(kuhl_geometry *geom, GLuint prog, char* filename){
 	// The 2 parameter above means each texture coordinate is a 2D coordinate.
 	
 	/* Load the texture. It will be bound to texId */	
-	printf("loading a texture: %s\n",filename);
+	//printf("loading a texture: %s\n",filename);
 	GLuint texId = 0;
 	float ratio = kuhl_read_texture_file(filename, &texId);
-	printf("Quad Aspect Ratio: %f\n", ratio);
+	//printf("Quad Aspect Ratio: %f\n", ratio);
 	/* The data that we want to draw */
+	float angle,x=0;
+	if(num_images >= 3){
+		angle = (2 * pi) / num_images;
+		x = 2*sin(angle/2);
+	}else{
+		angle = (pi/2);
+		x = 2*sin(angle/2);
+	}
+	
 
 	float xratio,yratio = 1;
-	if(ratio < 1){
-		xratio = ratio;
-		yratio = 1;
-	}else{
-		xratio = 1;
-		yratio = 1/ratio;
-	}
+	xratio = x;
+	yratio = 1/ratio;
 
-	printf("XRATIO: %.3f, YRATIO: %.3f\n",xratio,yratio);
+	//printf("XRATIO: %.3f, YRATIO: %.3f\n",xratio,yratio);
 
-	GLfloat vertexData[16] = {	0 * xratio, 0 * yratio, 0,
-								1 * xratio, 0 * yratio, 0,
-								1 * xratio, 1 * yratio, 0,
-								0 * xratio, 1 * yratio, 0};
+	GLfloat vertexData[16] = {	-xratio/2, 0, 0,
+								xratio/2, 0, 0,
+								xratio/2, yratio, 0,
+								-xratio/2, yratio, 0};
 
 	kuhl_geometry_attrib(geom, vertexData, 3, "in_Position", KG_WARN);
 	kuhl_errorcheck();
@@ -183,7 +202,7 @@ void init_geometryQuad(kuhl_geometry *geom, GLuint prog, char* filename){
 	kuhl_geometry_indices(geom, indexData, 6);
 
 	kuhl_errorcheck();
-	printf("Finished a quad\n");
+	//printf("Finished a quad\n");
 }
 
 int main(int argc, char** argv){
@@ -192,18 +211,18 @@ int main(int argc, char** argv){
 	kuhl_ogl_init(&argc, argv, 512, 512, 32, 4);
 	char** images;
 	num_images = 0;
-	char def[] = "../images/kitten.jpg";
+	//char def[] = "../images/kitten.jpg";
 	if(argc < 2){
 		printf("Usage: ./carousel <img 1> <img 2>...\n");
-		images = malloc(sizeof(char*));
-		images[0] = &def;
-		printf("Setting default image: %s\n", def);
-		num_images = 1;
+		exit(0);
 	}else{
 		images = (char**)malloc(sizeof(char*) * (argc-1));
+		printf("%d  ", argc);
 		for (int i = 1; i < argc; i++){
+			printf("%s  ", argv[i]);
 			images[i-1] = argv[i];
 		}
+		printf("\n");
 		num_images = argc-1;
 	}
 	
@@ -218,17 +237,35 @@ int main(int argc, char** argv){
 	kuhl_errorcheck();
 
 	t_matrix = (float**)malloc(sizeof(float*) * (num_images));
+	for(int i = 0; i < num_images; i++)
+		t_matrix[i] = (float*)malloc(sizeof(float)*16);
 	printf("Translations Malloced\n");
 	quads = (kuhl_geometry*)malloc(sizeof(kuhl_geometry) * (num_images));
+	angles = (float*)malloc(sizeof(float) * (num_images));
 	printf("Quads Malloced\n");
+	std_angle = 360/num_images;
 
 	glUseProgram(program);
-	for (int i = 0; i < num_images; i++){
-		init_geometryQuad(&quads[i], program, images[i]);
-		t_matrix[i] = (float*)malloc(sizeof(float) * 16);
-		mat4f_translate_new(t_matrix[i],1.1 * (i),0,0);
-	}
+	for (int j = 0; j < num_images/2; j+=1){		
+		int h = (num_images-1)-j;
+		int l = j;
+		init_geometryQuad(&quads[2*j], program, images[l]);
+		mat4f_translate_new(t_matrix[2*j],0,-3,-4);
+		angles[j] = std_angle * l;
+		init_geometryQuad(&quads[2*j+1], program, images[h]);
+		mat4f_translate_new(t_matrix[2*j+1],0,-3,-4);
+		angles[2*j+1] = std_angle * h;
 
+		printf("%d  %d  ",l,h);
+	}
+	if(num_images%2 == 1){
+		int i = num_images/2;
+		printf("%d",i);
+		init_geometryQuad(&quads[num_images-1], program, images[i]);
+		mat4f_translate_new(t_matrix[num_images-1],0,-3,-3);
+		angles[num_images-1] = std_angle * i;
+	}
+	printf("\n");
 	/* Good practice: Unbind objects until we really need them. */
 	glUseProgram(0);
 	printf("Quads made\n");
@@ -257,6 +294,7 @@ int main(int argc, char** argv){
 	}
 	free(t_matrix);
 	free(images);
+	free(angles);
 
 	exit(EXIT_SUCCESS);
 }
