@@ -265,6 +265,10 @@ int main(int argc, char** argv){
 		angles[num_images-1] = std_angle * i;
 	}
 	printf("\n");
+
+	for(int i = 0; i < num_images; i++){
+		printf("ANGLE:  %d   %f\n", i, angles[i]);
+	}
 	/* Good practice: Unbind objects until we really need them. */
 	glUseProgram(0);
 	printf("Quads made\n");
