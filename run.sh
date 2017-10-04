@@ -1,0 +1,3 @@
+make carousel
+bin/carousel ../images/blue.png ../images/kitten.jpg ../images/meeka.jpg ../images/angry_meeka.jpg ../images/angry_miet.jpg ../images/checkerboard.png ../images/rainbow-alpha.png ../images/miet.jpg ../images/pavers.jpg
+#bin/carousel ../images/blue.png ../images/blue.png ../images/blue.png ../images/blue.png ../images/blue.png ../images/blue.png ../images/blue.png ../images/blue.png ../images/blue.png ../images/blue.png ../images/blue.png ../images/blue.png 

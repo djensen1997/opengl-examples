@@ -16,6 +16,7 @@
 #include <math.h>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <float.h>
 
 static GLuint program = 0; /**< id value for the GLSL program */
 static GLuint duckProg = 0;
@@ -128,9 +129,6 @@ void display()
 			angle = sv_angle;
 		}
 		
-		//get the order to draw the faces
-		int order[num_images];
-		calcOrder(order, angle);
 		//float angle = 0;
 		/* Create a scale matrix. */
 		float scaleMatrix[16];
@@ -139,6 +137,13 @@ void display()
 
 		//draw the duck
 		float model[16] = { 1,0,0,0,0,1,0,0,0,0,1,0,-.081,-.525,.022,1};
+		float d_scale[16];
+		//float rotMat[16];
+		//mat4f_rotateAxis_new(rotMat, angle, 0, 1, 0);
+		mat4f_scale_new(d_scale, 1.75, 1.75, 1.75);
+		mat4f_mult_mat4f_new(model,d_scale,model);
+		//mat4f_mult_mat4f_new(model,rotMat,model);
+		//float model[16] = { 0.009,0,0,0,0,.009,0,0,0,0,.009,0,-.081,-.525,.022,1};
 		glUseProgram(duckProg);
 		float mv[16];
 		mat4f_mult_mat4f_new(mv,viewMat,model);
@@ -157,44 +162,83 @@ void display()
 		kuhl_errorcheck();
 		kuhl_geometry_draw(duck);
 		glUseProgram(0);
-		//draw the pict
+
+
+
+		//calculate all quad's modelviews
 		
+		float modelview[num_images][16];
 		for (int i = 0; i < num_images; i+=1){
-			int index = order[i];
-			
 			float rotMat[16];
-			float t_angle = angle + angles[index];
+			float t_angle = angle + angles[i];
 			t_angle = fmod(t_angle,360);
 			mat4f_rotateAxis_new(rotMat, t_angle, 0, 1, 0);
-			// Modelview = (viewMatrix * scaleMatrix) * rotationMatrix
-			float modelview[16];
-			mat4f_mult_mat4f_new(modelview, t_matrix[index], scaleMatrix );
-			mat4f_mult_mat4f_new(modelview, rotMat,  modelview);
+			mat4f_mult_mat4f_new(&(modelview[i]), t_matrix[i], scaleMatrix );
+			mat4f_mult_mat4f_new(&(modelview[i]), rotMat,  &(modelview[i]));
 			
-			mat4f_mult_mat4f_new(modelview, viewMat, modelview);
-			
-			/* Tell OpenGL which GLSL program the subsequent
-			* glUniformMatrix4fv() calls are for. */
+			mat4f_mult_mat4f_new(&(modelview[i]), viewMat, &(modelview[i]));
+		}
+		
+		//order from farthest to closest
+		int order[num_images];
+		float tests[num_images];
+		for (int i = 0; i < num_images; i++){
+			tests[i] = -100000000;
+			order[i] = i;
+		}
+		
+		for(int i = 0; i<num_images; i++){
+			float test[4] = {0,0,0,1};
+			mat4f_mult_mat4f_new(test,&(modelview[i]),test);
+			float norm = vec4f_norm(test);
+			int index = i;
+			for(int j = 0; j <= i; j++){
+				if(tests[j] < norm){
+					float temp = tests[j];
+					int tempi = order[j];
+					if(j+1 == num_images){
+						tests[j] = norm;
+						order[i] = index;
+					}else{
+						tests[j] = norm;
+						order[j] = index;
+						index = tempi;
+						norm = temp;
+					}
+				}
+			}
+		}
+		/*
+		printf("Draw Order: ");
+		for (int i = 0; i < num_images; i++){
+			printf("%d  ", order[i]);
+		}
+		printf("\n");
+
+		printf("Norm Order: ");
+		for (int i = 0; i < num_images; i++){
+			printf("%,2f  ", tests[i]);
+		}
+		printf("\n");
+		*/
+		//draw quads
+		for(int i = 0; i < num_images; i+=1){
+			int index = order[i];
 			kuhl_errorcheck();			
 			glUseProgram(program);
 			kuhl_errorcheck();
 			
-			/* Send the perspective projection matrix to the vertex program. */
 			glUniformMatrix4fv(kuhl_get_uniform("Projection"),
 							1, // number of 4x4 float matrices
 							0, // transpose
 							perspective); // value
-			/* Send the modelview matrix to the vertex program. */
 			glUniformMatrix4fv(kuhl_get_uniform("ModelView"),
 							1, // number of 4x4 float matrices
 							0, // transpose
-							modelview); // value
+							modelview[index]); // value
 			kuhl_errorcheck();
-			/* Draw the geometry using the matrices that we sent to the
-			* vertex programs immediately above */
 			kuhl_geometry_draw(&quads[index]);
-
-			//glUseProgram(0); // stop using a GLSL program.
+			glUseProgram(0); // stop using a GLSL program.
 		}
 		viewmat_end_eye(viewportID);
 	} // finish viewport loop
@@ -224,19 +268,21 @@ void init_geometryQuad(kuhl_geometry *geom, GLuint prog, char* filename){
 	float ratio = kuhl_read_texture_file(filename, &texId);
 	//printf("Quad Aspect Ratio: %f\n", ratio);
 	/* The data that we want to draw */
-	float angle,x=0;
+	float angle,x,y=0;
 	if(num_images >= 3){
 		angle = (2 * pi) / num_images;
 		x = 2*sin(angle/2);
+		y = 2*sin(angle/2);
 	}else{
 		angle = (pi/2);
 		x = 2*sin(angle/2);
+		y = 2*sin(angle/2);
 	}
 	
 
 	float xratio,yratio = 1;
 	xratio = x;
-	yratio = 1/ratio;
+	yratio = y * 1/ratio;
 
 	//printf("XRATIO: %.3f, YRATIO: %.3f\n",xratio,yratio);
 
