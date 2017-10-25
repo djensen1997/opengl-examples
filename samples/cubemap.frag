@@ -7,6 +7,7 @@ in vec3 out_Normal; // normal vector in WORLD coordinates
 in vec3 out_WorldCoord; // position of fragment in WORLD coordinates
 in vec3 out_CamPos; // position of camera in WORLD coordinates
 in vec3 out_CamCoord;
+in vec3 out_Color;
 
 uniform sampler2D tex; // texture from the model (not needed for this assignment!)
 uniform sampler2D NegXTex;
@@ -60,6 +61,7 @@ void main()
 	/* Calculate diffuse shading */
 	//float diffuse = diffuseScalar(out_Normal, lightDir, true);
 	reflect(reflectionVec, norm_normal);
-	fragColor.xyz = /*(vec4((reflectionVec+1)/2,1) **/ vec4(1.0, 0.2, 0.1, 1.0).xyz;
 	
+	fragColor.xyz = (vec4((reflectionVec+1)/2,1) * vec4(0.8, 0.2, 0.1, 1.0)).xyz;
+	fragColor.a = 1;
 }

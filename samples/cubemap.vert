@@ -26,11 +26,11 @@ void main()
 	// Copy texture coordinates and color to fragment program
 	out_TexCoord = in_TexCoord;
 	out_Color = in_Color;
-	mat4 inverseView = inverse(ViewMat);
+	mat3 inverseView = inverse(mat3(ViewMat));
 
-	vec4 cameraCoords = vec4(0,0,0,0); //in camera coords, the camera would be at the origin.
+	vec4 cameraCoords = vec4(0,0,0,1); //in camera coords, the camera would be at the origin.
 
-	out_CamPos = vec3((inverseView * cameraCoords).xyz);
+	out_CamPos = vec3((inverseView * cameraCoords.xyz));
 
 	mat4 actualModelView;
 	if(NumBones > 0)
@@ -44,8 +44,10 @@ void main()
 	else
 		actualModelView = ModelView * GeomTransform;
 
+	mat3 normalMat = transpose(inverse(mat3(actualModelView)));
+	
 	// Transform normal from object coordinates to camera coordinates
-	out_Normal = vec3(normalize(inverseView * actualModelView * vec4(in_Normal.xyz,0)).xyz);
+	out_Normal = normalize(inverseView * normalMat * in_Normal);
 
 	// Transform vertex from object to unhomogenized Normalized Device
 	// Coordinates (NDC).
@@ -53,5 +55,5 @@ void main()
 
 	// Calculate the position of the vertex in camera coordinates:
 	out_CamCoord = vec3(actualModelView * vec4(in_Position.xyz, 1));
-	out_WorldCoord = vec3((inverseView * vec4(out_CamCoord.xyz,1)).xyz);
+	out_WorldCoord = inverseView * out_CamCoord;
 }

@@ -380,11 +380,20 @@ void display()
 }
 
 void drawDuck(float* modelMat, float* viewMat, float* perspective){
+	float[16] geomtrans = { 1,0,0,0,0,1,0,0,0,0,1,0,-.081,-.525,.022,1};
+	glUniformMatrix4fv(kuhl_get_uniform("GeomTransform"),
+					1,
+					0,
+					geomtrans);
+
+
 	/* Send the perspective projection matrix to the vertex program. */
 	glUniformMatrix4fv(kuhl_get_uniform("Projection"),
 	1, // number of 4x4 float matrices
 	0, // transpose
 	perspective); // value
+
+
 	kuhl_errorcheck();
 	glUniformMatrix4fv(kuhl_get_uniform("ViewMat"),
 	1,
