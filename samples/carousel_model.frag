@@ -55,6 +55,6 @@ void main()
 	 *	fragColor.xyz = (specular + (diffuse/2+.5))*vec3(.5, .5, .5);
 	 *	fragColor.a = 1;
 	*/
-	fragColor.xyz = (specular + (diffuse/2+.5))*vec3(.5,.5,.5);
+	fragColor.xyz = (specular + (diffuse))*vec3(.5,.5,.5);
 	fragColor.a = 1;
 }

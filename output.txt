@@ -1,0 +1,27 @@
+[INFO ] Messages are being written to 'log.txt'
+[INFO ] Failed to read default config file: settings.ini
+[INFO ] GLSL prog 1: Creating vertex (cubemap.vert) & fragment (cubemap.frag) shaders
+[INFO ] GLSL prog 1: Active attributes: in_Position@0 in_Color@1 in_TexCoord@2 in_BoneIndex@3 in_BoneWeight@4 in_Normal@5 
+[INFO ] GLSL prog 1: Active uniforms: BoneMat[0]@0 ViewMat@512 GeomTransform@516 NumBones@520 Projection@521 ModelView@525 
+[INFO ] GLSL prog 1: AttachedShaderCount=2 Size=0 
+[INFO ] viewmat display mode: Single window desktop mode.
+[INFO ] viewmat control mode: Mouse movement
+[INFO ] Loading model: /Users/DaneJensen/Documents/baymax/graphics/opengl-examples/bin/../models/sphere/sphere.dae
+[INFO ] Loading model: /Users/DaneJensen/Documents/baymax/graphics/opengl-examples/bin/../models/origin/origin.obj
+[WARN ] Texture sampler 'tex' was missing in GLSL program 1.
+[INFO ] Latency reduction is turned on; assuming monitor is 59Hz and we have 16949 microseconds/frame
+[INFO ] Set bufferswap.latencyreduce to 0 to disable latency reduction.
+[WARN ] Texture sampler 'tex' was missing in GLSL program 1.
+[WARN ] Texture sampler 'tex' was missing in GLSL program 1.
+[WARN ] Texture sampler 'tex' was missing in GLSL program 1.
+[WARN ] Texture sampler 'tex' was missing in GLSL program 1.
+[WARN ] Texture sampler 'tex' was missing in GLSL program 1.
+[INFO ] Missed approximately 0.82 frame(s), 30889 usec have elapsed
+[WARN ] Texture sampler 'tex' was missing in GLSL program 1.
+[WARN ] Texture sampler 'tex' was missing in GLSL program 1.
+[WARN ] Texture sampler 'tex' was missing in GLSL program 1.
+[INFO ] Missed approximately 1.33 frame(s), 39460 usec have elapsed
+[INFO ] Missed approximately 1.06 frame(s), 34921 usec have elapsed
+[WARN ] Texture sampler 'tex' was missing in GLSL program 1.
+[WARN ] Texture sampler 'tex' was missing in GLSL program 1.
+[WARN ] Texture sampler 'tex' was missing in GLSL program 1.
