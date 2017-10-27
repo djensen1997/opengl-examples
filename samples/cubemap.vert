@@ -3,7 +3,6 @@
 in vec3 in_Position;
 in vec2 in_TexCoord;
 in vec3 in_Normal;
-in vec3 in_Color;
 in vec4 in_BoneIndex;
 in vec4 in_BoneWeight;
 
@@ -14,23 +13,26 @@ uniform mat4 Projection;
 uniform mat4 ViewMat;
 uniform mat4 GeomTransform;
 
+
+
+uniform sampler2D NegXTex;
+uniform sampler2D PosXTex;
+uniform sampler2D NegYTex;
+uniform sampler2D PosYTex;
+uniform sampler2D NegZTex;
+uniform sampler2D PosZTex; 
+uniform sampler2D tex;
+
 out vec2 out_TexCoord;
-out vec3 out_Color;
 out vec3 out_Normal;   // normal vector (camera coordinates)
 out vec3 out_CamCoord; // vertex position (camera coordinates)
 out vec3 out_WorldCoord;
-out vec3 out_CamPos; //camera location in world coordinates
+out vec3 out_CamPos;
 
 void main() 
 {
 	// Copy texture coordinates and color to fragment program
-	out_TexCoord = in_TexCoord;
-	out_Color = in_Color;
-	mat3 inverseView = inverse(mat3(ViewMat));
-
-	vec4 cameraCoords = vec4(0,0,0,1); //in camera coords, the camera would be at the origin.
-
-	out_CamPos = vec3((inverseView * cameraCoords.xyz));
+	mat4 inverseView = inverse(ViewMat);
 
 	mat4 actualModelView;
 	if(NumBones > 0)
@@ -44,16 +46,17 @@ void main()
 	else
 		actualModelView = ModelView * GeomTransform;
 
-	mat3 normalMat = transpose(inverse(mat3(actualModelView)));
+	mat4 normalMat = transpose(inverse(mat4(actualModelView)));
+	out_Normal = vec3((inverseView * actualModelView * vec4(in_Normal.xyz,0)).xyz);
 	
+	out_WorldCoord = (inverseView * actualModelView * vec4(in_Position.xyz,1)).xyz;
+
+	out_CamPos = (inverseView * vec4(0,0,0,1)).xyz;
 	// Transform normal from object coordinates to camera coordinates
-	out_Normal = normalize(inverseView * normalMat * in_Normal);
+	//out_Normal = normalize(inverseView * normalMat * vec4(in_Normal.xyz,1)).xyz;
 
 	// Transform vertex from object to unhomogenized Normalized Device
 	// Coordinates (NDC).
 	gl_Position = Projection * actualModelView * vec4(in_Position.xyz, 1);
 
-	// Calculate the position of the vertex in camera coordinates:
-	out_CamCoord = vec3(actualModelView * vec4(in_Position.xyz, 1));
-	out_WorldCoord = inverseView * out_CamCoord;
 }
