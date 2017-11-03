@@ -1509,7 +1509,7 @@ void kuhl_geometry_draw(kuhl_geometry *geom)
 	/* Check that there is a valid program and VAO object for us to use. */
 	if(glIsProgram(geom->program) == 0)
 	{
-		msg(MSG_ERROR, "Program (%d) is invalid.\n", geom->program);
+		msg(MSG_ERROR, "Program (%d) is invalid. Have you initialized this kuhl_geometry object?\n", geom->program);
 		kuhl_errorcheck();
 		return;
 	}
@@ -2014,21 +2014,19 @@ void kuhl_flip_texture_array(unsigned char *image, const int width, const int he
 	// printf("Flipping texture with width = %d, height = %d\n", width, height);
 	unsigned int bytesPerRow = components * width; // 1 byte per component
 	unsigned int pivot = height/2;
+
+	unsigned char *temp = kuhl_malloc(bytesPerRow);
 	for (unsigned i = 0; i < pivot; ++i) 
 	{
 		unsigned char *lineTop = (image + i * bytesPerRow);
 		unsigned char *lineBottom = (image + (height - i - 1) * bytesPerRow);
 		// printf("Swapping %d with %d\n", i, height-i-1);
-		for (unsigned j = 0; j < bytesPerRow; ++j)
-		{
-			unsigned char a = *lineTop;
-			unsigned char b = *lineBottom;
-			*lineTop = b;
-			*lineBottom = a;
-			lineTop++;
-			lineBottom++;
-		}
+
+		memcpy(temp, lineTop, bytesPerRow);
+		memcpy(lineTop, lineBottom, bytesPerRow);
+		memcpy(lineBottom, temp, bytesPerRow);
 	}
+	free(temp);
 }
 
 
@@ -2151,6 +2149,18 @@ static float kuhl_read_texture_file_stb(const char *filename, GLuint *texName, G
  */
 float kuhl_read_texture_file_wrap(const char *filename, GLuint *texName, GLuint wrapS, GLuint wrapT)
 {
+	if(filename == NULL)
+	{
+		msg(MSG_ERROR, "Failed to load texture file because filename was NULL.");
+		return -1;
+	}
+	if(texName == NULL)
+	{
+		msg(MSG_ERROR, "Failed to load texture file because texName was NULL.");
+		return -1;
+	}
+	
+	
 #ifdef KUHL_UTIL_USE_IMAGEMAGICK
 	return kuhl_read_texture_file_im(filename, texName, wrapS, wrapT);
 #else
@@ -2348,6 +2358,12 @@ static int textureIdMapSize = 0; /**< Number of items in textureIdMap */
  */
 static void kuhl_private_calc_bbox(const struct aiNode* nd, struct aiMatrix4x4* transform, const struct aiScene *scene, float bbox[6])
 {
+	// Create an identity transform matrix which we can use in case
+	// the transform parameter is NULL. We must declare it here since
+	// we will make transform point to it.
+	struct aiMatrix4x4 ident;
+	aiIdentityMatrix4(&ident);
+
 	/* When this method is called on the root node, the trafo matrix should be set to NULL. */
 	if(transform == NULL)
 	{
@@ -2358,9 +2374,6 @@ static void kuhl_private_calc_bbox(const struct aiNode* nd, struct aiMatrix4x4* 
 		bbox[4]=FLT_MAX;
 		bbox[5]=-FLT_MAX;
 		
-		// Set transform matrix to identity
-		struct aiMatrix4x4 ident;
-		aiIdentityMatrix4(&ident); 
 		transform = &ident;
 	}
 
@@ -3219,7 +3232,7 @@ static kuhl_geometry* kuhl_private_load_model(const struct aiScene *sc,
 				texCoord[i*2+0] = mesh->mTextureCoords[0][i].x;
 				texCoord[i*2+1] = mesh->mTextureCoords[0][i].y;
 			}
-			kuhl_geometry_attrib(geom, texCoord, 2, "in_TexCoord", 1);
+			kuhl_geometry_attrib(geom, texCoord, 2, "in_TexCoord", 0);
 			free(texCoord);
 		}
 
@@ -3482,7 +3495,7 @@ void kuhl_update_model(kuhl_geometry *first_geom, unsigned int animationNum, flo
  *
  * @return Returns a kuhl_geometry object that can be later drawn. If
  * the model contains multiple meshes, kuhl_geometry will be a linked
- * list (i.e., geom->next will not be NULL). Returns NULL on error.
+ * list (i.e., geom->next will not be NULL). Calls exit() on error.
  */
 kuhl_geometry* kuhl_load_model(const char *modelFilename, const char *textureDirname,
                                GLuint program, float bbox[6])
@@ -3493,7 +3506,8 @@ kuhl_geometry* kuhl_load_model(const char *modelFilename, const char *textureDir
 	if(scene == NULL)
 	{
 		msg(MSG_ERROR, "ASSIMP was unable to import the model '%s'.\n", modelFilename);
-		return NULL;
+		//return NULL;
+		exit(EXIT_FAILURE);
 	}
 
 	// Convert the information in aiScene into a kuhl_geometry object.

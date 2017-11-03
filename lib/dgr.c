@@ -13,6 +13,7 @@
  */
 
 #include "windows-compat.h"
+#include "kuhl-nodep.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -56,7 +57,9 @@ static int dgr_list_size = 0;
 
 /* The socket that we are sending/receiving from */
 static int dgr_socket;
-static struct addrinfo *dgr_addrinfo;
+#define DGR_ADDRINFO_MAX_SIZE 32  /**< Maximum number of hosts we can send packets to. */
+static struct addrinfo *dgr_addrinfo[DGR_ADDRINFO_MAX_SIZE];
+static int dgr_addrinfo_len = 0;  /**< if master, how many addresses to send packets to; length of dgr_addrinfo. */
 static time_t dgr_time_lastreceive; /**< time we received last packet, 0 if haven't received anything yet. */
 
 /* Other DGR variables. */
@@ -77,53 +80,68 @@ static void dgr_free(void)
 static void dgr_init_master()
 {
 #if !defined __MINGW32__ && !defined _WIN32
-	const char *ipAddr = kuhl_config_get("dgr.master.destip");
-	const char *port = kuhl_config_get("dgr.master.destport");
+	const char *ipAddr = kuhl_config_get("dgr.master.dest");
 
-	if(ipAddr == NULL || strcmp(ipAddr, "0.0.0.0") == 0)
+	char *tokens[DGR_ADDRINFO_MAX_SIZE*2];
+	int numTokens = kuhl_tokenize(tokens, DGR_ADDRINFO_MAX_SIZE*2, ipAddr, " ");
+
+	if(numTokens == 0)
 	{
 		dgr_disabled = 1;
-		msg(MSG_ERROR, "DGR Master: Won't transmit since IP address was not provided or was 0.0.0.0.\n");
+		msg(MSG_ERROR, "DGR Master: Won't transmit since IP address was not provided.\n");
+	}
+	else if(numTokens % 2 == 1)
+	{
+		dgr_disabled = 1;
+		msg(MSG_ERROR, "DGR Master: Won't transmit since dgr.master.dest must have an even number of tokens in it: ipaddr1 port1 ipaddr2 port2 ....\n");
 	}
 	else
 		dgr_disabled = 0;
 
-	if(port == NULL)
+
+	for(int i=0; i<numTokens; i=i+2)
 	{
-		msg(MSG_FATAL, "DGR Master: No port was specified in the DGR_MASTER_DEST_PORT environment variable.\n");
-		exit(EXIT_FAILURE);
-	}
+		char *addr = tokens[i];
+		char *port = tokens[i+1];
 
-	msg(MSG_INFO, "DGR Master: Preparing to send packets to %s port %s.\n", ipAddr, port);
+		msg(MSG_INFO, "DGR Master: Preparing to send packets to %s port %s.\n", addr, port);
 	
-	struct addrinfo hints, *servinfo;
-	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_DGRAM;
+		struct addrinfo hints, *servinfo;
+		memset(&hints, 0, sizeof hints);
+		hints.ai_family = AF_UNSPEC;
+		hints.ai_socktype = SOCK_DGRAM;
 
-	int rv;
-	if ((rv = getaddrinfo(ipAddr, port, &hints, &servinfo)) != 0) {
-		msg(MSG_ERROR, "DGR Master: getaddrinfo: %s\n", gai_strerror(rv));
-		exit(1);
-	}
-	
-	// loop through all the results and make a socket
-	struct addrinfo *p;
-	for(p = servinfo; p != NULL; p = p->ai_next) {
-		if ((dgr_socket = socket(p->ai_family, p->ai_socktype,
-		                         p->ai_protocol)) == -1) {
-			msg(MSG_ERROR, "DGR: Master: socket(): %s", strerror(errno));
-			continue;
+		int rv;
+		if ((rv = getaddrinfo(addr, port, &hints, &servinfo)) != 0) {
+			msg(MSG_ERROR, "DGR Master: getaddrinfo: %s\n", gai_strerror(rv));
+			exit(1);
 		}
-		break;
+	
+		// loop through all the results and make a socket
+		struct addrinfo *p;
+		for(p = servinfo; p != NULL; p = p->ai_next) {
+			if ((dgr_socket = socket(p->ai_family, p->ai_socktype,
+			                         p->ai_protocol)) == -1) {
+				msg(MSG_ERROR, "DGR: Master: socket(): %s", strerror(errno));
+				continue;
+			}
+			break;
+		}
+
+		if (p == NULL) {
+			msg(MSG_FATAL, "DGR Master: failed to bind socket\n");
+			exit(EXIT_FAILURE);
+		}
+
+		dgr_addrinfo[dgr_addrinfo_len] = p;
+		dgr_addrinfo_len++;
+
+		// bail out of loop if too many IP addresses are specified.
+		if(dgr_addrinfo_len >= DGR_ADDRINFO_MAX_SIZE)
+			i = numTokens;
 	}
 
-	if (p == NULL) {
-		msg(MSG_FATAL, "DGR Master: failed to bind socket\n");
-		exit(EXIT_FAILURE);
-	}
-
-	dgr_addrinfo = p;
+	kuhl_tokenize_free(tokens, DGR_ADDRINFO_MAX_SIZE*2);
 #endif // __MINGW32__
 }
 
@@ -525,18 +543,21 @@ static void dgr_send(void)
 	 * only expect to send 1472 bytes. Even with the small MTU, the
 	 * system may still allow us to send larger UDP packets due to
 	 * IPv4 fragmentation. */
-	int numbytes;
-	if((numbytes = sendto(dgr_socket, buf, bufSize, 0,
-	                      dgr_addrinfo->ai_addr, dgr_addrinfo->ai_addrlen)) == -1) {
-		msg(MSG_FATAL, "DGR Master: sendto: %s", strerror(errno));
-		exit(EXIT_FAILURE);
+	for(int i=0; i<dgr_addrinfo_len; i++)
+	{
+		int numbytes;
+		if((numbytes = sendto(dgr_socket, buf, bufSize, 0,
+		                      dgr_addrinfo[i]->ai_addr, dgr_addrinfo[i]->ai_addrlen)) == -1) {
+			msg(MSG_FATAL, "DGR Master: sendto: %s", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+		if(numbytes != bufSize) // double check that everything got sent
+		{
+			msg(MSG_FATAL, "DGR Master: Error sending all of the bytes in the message.");
+			exit(EXIT_FAILURE);
+		}
 	}
 	free(buf);
-	if(numbytes != bufSize) // double check that everything got sent
-	{
-		msg(MSG_FATAL, "DGR Master: Error sending all of the bytes in the message.");
-		exit(EXIT_FAILURE);
-	}
 #endif // __MINGW32__
 }
 
@@ -560,7 +581,7 @@ static void dgr_receive(int timeout)
 		int seconds = 15;
 		if(time(NULL) - dgr_time_lastreceive >= seconds)
 		{
-			msg(MSG_FATAL, "DGR Slave: dgr_receive() hasn't received packets within %d seconds. We did receive one or more packets earlier. Did the master or relay die? Exiting...\n", seconds);
+			msg(MSG_FATAL, "DGR Slave: dgr_receive() hasn't received packets within %d seconds. We did receive one or more packets earlier. Did the master die? Exiting...\n", seconds);
 			exit(EXIT_FAILURE);
 		}
 	}
