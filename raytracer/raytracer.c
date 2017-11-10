@@ -54,137 +54,11 @@ Ray* getRay(Perspective* p, float* from, float* to){
     }
     Ray* output = (Ray*)malloc(sizeof(Ray));
     vec_cpy(output->vector, vec, 3);
+    vec3f_normalize(output->vector, output->vector);
     vec_cpy(output->position, to, 3);
     
     return output;
 }
-
-void prepTestScene(Scene* scene){
-    scene->spheres = (Sphere*)malloc(sizeof(Sphere) * 3);
-    scene->num_spheres = 3;
-    scene->triangles = (Triangle*)malloc(sizeof(Triangle) * 6);
-    scene->num_triangles = 6;
-
-    scene->light_loc[0] = 0.00;
-    scene->light_loc[1] = 1;
-    scene->light_loc[2] = -2.1;
-
-
-    materials[0] = (Material*)malloc(sizeof(Material));
-    unsigned char blue[] = {10,10,255};
-    for(int i= 0; i < 3; i++)
-        materials[0]->color[i] = blue[i];
-    materials[0]->reflective = DIFFUSE;
-
-
-
-    materials[1] = (Material*)malloc(sizeof(Material));
-    unsigned char red[] = {255,10,10};
-    for(int i= 0; i < 3; i++)
-        materials[1]->color[i] = red[i];
-    materials[1]->reflective = DIFFUSE;
-
-    materials[2] = (Material*)malloc(sizeof(Material));
-    materials[2]->reflective = REFLECTIVE;
-    unsigned char grey[] = {100,100,100 };
-    for(int i = 0 ; i < 3; i++)
-        materials[2]->color[i] = grey[i];
-
-
-    materials[3] = (Material*)malloc(sizeof(Material));
-    unsigned char green[] = {10,125,10};
-    for(int i= 0; i < 3; i++)
-        materials[3]->color[i] = green[i];
-    materials[3]->reflective = DIFFUSE;
-
-    materials[4] = (Material*)malloc(sizeof(Material));
-    for(int i= 0; i < 3; i++)
-        materials[4]->color[i] = grey[i];
-    materials[4]->reflective = DIFFUSE;
-
-
-    materials[5] = (Material*)malloc(sizeof(Material));
-    unsigned char pink[] = {244,66,241};
-    for(int i= 0; i < 3; i++)
-        materials[5]->color[i] = pink[i];
-    materials[5]->reflective = DIFFUSE;
-
-    materials[6] = (Material*)malloc(sizeof(Material));
-    unsigned char white[] = {255,255,255};
-    for(int i= 0; i < 3; i++)
-        materials[6]->color[i] = white[i];
-    materials[6]->reflective = DIFFUSE;
-
-    float pos[3];
-    pos[0] = 0;
-    pos[1] = 0;
-    pos[2] = -2.3;
-    init_sphere(&(scene->spheres[0]), pos, .1, materials[0]);
-
-    pos[0] = -.4;
-    pos[1] = .1;
-    pos[2] = -7;
-    init_sphere(&(scene->spheres[1]), pos, .3, materials[1]);
-
-    pos[0] = .2;
-    pos[1] = -.1;
-    pos[2] = -3.7;
-    init_sphere(&(scene->spheres[2]), pos, .1, materials[2]);
-
-    float verts[9] = {
-        -1, -1, -10,
-        1,  1,  -10,
-        -1, 1,  -10
-    };
-    float norm1[3] = {
-        0,0,1
-    };
-    init_triangle(&(scene->triangles[0]), verts, norm1, materials[3]);
-    float verts2[9] = {
-        -1, -1, -10,
-        1,  1,  -10,
-        1,  -1, -10
-    };
-    init_triangle(&(scene->triangles[1]), verts2, norm1, materials[3]);
-
-
-
-    float verts3[9] = {
-        -1, -1, -10,
-        -1, -1,  -2,
-        1,  -1, -10
-    };
-    float norm[3] = {
-        0,1,0
-    };
-    init_triangle(&(scene->triangles[2]), verts3, norm, materials[4]);
-    float verts4[9] = {
-        1, -1, -10,
-        -1, -1, -2,
-        1,  -1, -2
-    };
-    init_triangle(&(scene->triangles[3]), verts4, norm, materials[4]);
-
-
-
-    float verts5[9] = {
-        -1, -1,  -2,
-        1,  -1, -2,
-        -1, 1,  -2
-    };
-    float norm2[3] = {
-        0,0,-1
-    };
-    init_triangle(&(scene->triangles[4]), verts5, norm2, materials[5]);
-    float verts6[9] = {
-        1,  -1, -2,
-        1,  1,  -2,
-        -1, 1,  -2
-
-    };
-    init_triangle(&(scene->triangles[5]), verts6, norm2, materials[5]);
-}
-
 
 void destroyScene(Scene* scene){
     free(scene->spheres);
@@ -270,7 +144,7 @@ unsigned char* getRayHit(Ray* ray, Scene* scene){
 
                 vec3f_sub_vec3f(new->vector, ray->vector, temp2);
                 vec3f_normalize(new->vector, new->vector);
-                //vec_cpy(new->vector,norm,3);
+                vec_cpy(new->vector,norm,3);
 
                 //dumpRay(new);
                 color = getRayHit(new, scene);
@@ -278,7 +152,7 @@ unsigned char* getRayHit(Ray* ray, Scene* scene){
                 //printf("Reflected ray Color: ");
                 /*printf("Color Dump: \n");*/
                 //printf("\t R %d, G %d, B %d\n",color[0],color[1],color[2]);
-                //free(new);
+                free(new);
             }
             
         }else{
@@ -351,6 +225,85 @@ unsigned char* getRayHit(Ray* ray, Scene* scene){
     return color;
 }
 
+void prepTestScene(Scene* scene){
+    scene->num_spheres = 3;
+    scene->num_triangles = 4;
+    scene->spheres = (Sphere*)malloc(sizeof(Sphere) * scene->num_spheres);
+    scene->triangles = (Triangle*)malloc(sizeof(Triangle) * scene->num_triangles);
+
+    scene->light_loc[0] = 0.00;
+    scene->light_loc[1] = 1;
+    scene->light_loc[2] = -2.1;
+
+    float pos[3];
+    pos[0] = 0;
+    pos[1] = 0;
+    pos[2] = -3.3;
+    init_sphere(&(scene->spheres[0]), pos, .1, materials[0]);
+
+    pos[0] = -.4;
+    pos[1] = .1;
+    pos[2] = -7;
+    init_sphere(&(scene->spheres[1]), pos, .3, materials[1]);
+
+    pos[0] = .2;
+    pos[1] = -.1;
+    pos[2] = -5.7;
+    init_sphere(&(scene->spheres[2]), pos, .1, materials[2]);
+
+    float verts[9] = {
+        -1, -1, -10,
+        1,  1,  -10,
+        -1, 1,  -10
+    };
+    float norm1[3] = {
+        0,0,1
+    };
+    init_triangle(&(scene->triangles[0]), verts, norm1, materials[3]);
+    float verts2[9] = {
+        -1, -1, -10,
+        1,  1,  -10,
+        1,  -1, -10
+    };
+    init_triangle(&(scene->triangles[1]), verts2, norm1, materials[3]);
+
+
+
+    float verts3[9] = {
+        -1, -1, -10,
+        -1, -1,  -2,
+        1,  -1, -10
+    };
+    float norm[3] = {
+        0,1,0
+    };
+    init_triangle(&(scene->triangles[2]), verts3, norm, materials[4]);
+    float verts4[9] = {
+        1, -1, -10,
+        -1, -1, -2,
+        1,  -1, -2
+    };
+    init_triangle(&(scene->triangles[3]), verts4, norm, materials[4]);
+
+
+    /*
+    float verts5[9] = {
+        -1, -1,  -2,
+        1,  -1, -2,
+        -1, 1,  -2
+    };
+    float norm2[3] = {
+        0,0,-1
+    };
+    init_triangle(&(scene->triangles[4]), verts5, norm2, materials[5]);
+    float verts6[9] = {
+        1,  -1, -2,
+        1,  1,  -2,
+        -1, 1,  -2
+
+    };
+    init_triangle(&(scene->triangles[5]), verts6, norm2, materials[5]);*/
+}
 
 void prepDKScene(Scene* scene){
     scene->num_spheres = 3;
@@ -360,80 +313,132 @@ void prepDKScene(Scene* scene){
     
     scene->light_loc[0] = 3;
     scene->light_loc[1] = 5;
-    scene->light_loc[2] = -15;
-
-    double scale = 1;
-
-
+    scene->light_loc[2] = -15 * 5;
     // make a material which is reflective
-    Material* refl = materials[2];
     // color is not used when material is reflective!
     // make several diffuse materials to choose from
-    Material* red = materials[0];
-    Material* blue = materials[1];
-    Material* white = materials[6];
 
     // create three spheres
-    float pos1[3] = {0/scale,0/scale,-16/scale};
-    init_sphere(&(scene->spheres[0]), pos1, 2/scale, refl);
-    float pos2[3] = {3/scale,-1/scale,-14/scale};
-    init_sphere(&(scene->spheres[1]), pos2, 1/scale, refl);
-    float pos3[3] = {-3/scale,-1/scale,-14/scale};
-    init_sphere(&(scene->spheres[2]), pos3, 1/scale, red);
 
+    float scale = 5;
+    
+    float pos1[3];
+    pos1[0] = 0;
+    pos1[1] = 0;
+    pos1[2] = -16 * scale;
+    init_sphere(&(scene->spheres[0]), pos1, 2, materials[2]);
+
+    pos1[0] = 3;
+    pos1[1] = -1;
+    pos1[2] = -14 * scale;
+    init_sphere(&(scene->spheres[1]), pos1, 1, materials[2]);
+    
+    pos1[0] = -3;
+    pos1[1] = -1;
+    pos1[2] = -14 * scale;
+    init_sphere(&(scene->spheres[2]), pos1, 1, materials[0]);
+    
     // back wall
     float verts1[9] = {
-        -8/scale,-2/scale,-20/scale,
-        8/scale,-2/scale,-20/scale,
-        8/scale,10/scale,-20/scale
+        -8,-2,-20 * scale,
+        8,-2,-20 * scale,
+        8,10,-20 * scale
     };
     float norm1[3] = {
         0,0,1
     };
-    init_triangle(&(scene->triangles[0]), verts1, norm1, blue);
+    init_triangle(&(scene->triangles[0]), verts1, norm1, materials[1]);
     float verts2[9] = {
-        -8/scale,-2/scale,-20/scale,
-        8/scale,10/scale,-20/scale,
-        -8/scale,10/scale,-20/scale
+        -8,-2,-20 * scale,
+        8,10,-20 * scale,
+        -8,10,-20 * scale
 
     };
-    init_triangle(&(scene->triangles[1]), verts2, norm1, blue);
+    init_triangle(&(scene->triangles[1]), verts2, norm1, materials[1]);
 
     // floor
     float verts3[9] = {
-        -8/scale,-2/scale,-20/scale,
-        8/scale,-2/scale,-10/scale,
-        8/scale,-2/scale,-20/scale
+        -8,-2,-20 * scale,
+        8,-2,-10 * scale,
+        8,-2,-20 * scale
     };
     float norm2[3] = {
         0,1,0
     };
-    init_triangle(&(scene->triangles[2]), verts3, norm2, white);
+    init_triangle(&(scene->triangles[2]), verts3, norm2, materials[6]);
     float verts4[9] = {
-        -8/scale,-2/scale,-20/scale,
-        -8/scale,-2/scale,-10/scale,
-        8/scale,-2/scale,-10/scale
+        -8,-2,-20 * scale,
+        -8,-2,-10 * scale,
+        8,-2,-10 * scale
 
     };
-    init_triangle(&(scene->triangles[3]), verts4, norm2, white);
+    init_triangle(&(scene->triangles[3]), verts4, norm2, materials[6]);
 
 
 
     // right red triangle
     float verts5[9] = {
-        8/scale,10/scale,-20/scale,
-        8/scale,-2/scale,-10/scale,
-        8/scale,-2/scale,-20/scale
+        8,10,-20 * scale,
+        8,-2,-10 * scale,
+        8,-2,-20 * scale
     };
     float norm3[3] = {
         -1,0,0
     };
-    init_triangle(&(scene->triangles[4]), verts5, norm3, red);
+    init_triangle(&(scene->triangles[4]), verts5, norm3, materials[0]);
+    
 }
 
 
 void finalize(){
     
+}
+
+void prepMaterials(){
+    materials[0] = (Material*)malloc(sizeof(Material));
+    unsigned char blue[] = {10,10,255};
+    for(int i= 0; i < 3; i++)
+        materials[0]->color[i] = blue[i];
+    materials[0]->reflective = DIFFUSE;
+
+
+
+    materials[1] = (Material*)malloc(sizeof(Material));
+    unsigned char red[] = {255,10,10};
+    for(int i= 0; i < 3; i++)
+        materials[1]->color[i] = red[i];
+    materials[1]->reflective = DIFFUSE;
+
+    materials[2] = (Material*)malloc(sizeof(Material));
+    materials[2]->reflective = REFLECTIVE;
+    unsigned char grey[] = {100,100,100 };
+    for(int i = 0 ; i < 3; i++)
+        materials[2]->color[i] = 0;
+
+
+    materials[3] = (Material*)malloc(sizeof(Material));
+    unsigned char green[] = {10,125,10};
+    for(int i= 0; i < 3; i++)
+        materials[3]->color[i] = green[i];
+    materials[3]->reflective = DIFFUSE;
+
+    materials[4] = (Material*)malloc(sizeof(Material));
+    for(int i= 0; i < 3; i++)
+        materials[4]->color[i] = grey[i];
+    materials[4]->reflective = DIFFUSE;
+
+
+    materials[5] = (Material*)malloc(sizeof(Material));
+    unsigned char pink[] = {244,66,241};
+    for(int i= 0; i < 3; i++)
+        materials[5]->color[i] = pink[i];
+    materials[5]->reflective = DIFFUSE;
+
+    materials[6] = (Material*)malloc(sizeof(Material));
+    unsigned char white[] = {255,255,255};
+    for(int i= 0; i < 3; i++)
+        materials[6]->color[i] = white[i];
+    materials[6]->reflective = DIFFUSE;
 }
 
 
@@ -463,9 +468,12 @@ int main(int argc, char** argv){
     unsigned char c_img[(int)scene->screen_width][(int)scene->screen_height][3];
     unsigned char d_img[(int)scene->screen_width][(int)scene->screen_height][3];
     Scene* test_scene = (Scene*)malloc(sizeof(Scene));
-    prepTestScene(test_scene);
+    
     Scene* dk_scene = (Scene*)malloc(sizeof(Scene));
+    prepMaterials();
+    prepTestScene(test_scene);
     prepDKScene(dk_scene);
+    
     
     printf("Sceen Made\n");
 
@@ -486,6 +494,7 @@ int main(int argc, char** argv){
                 c_img[i][j][1] = color[1];
                 c_img[i][j][2] = color[2];
                 free(color);
+                free(curr);
             }
             {
                 float pixel[] = {
@@ -500,6 +509,7 @@ int main(int argc, char** argv){
                 d_img[i][j][1] = color[1];
                 d_img[i][j][2] = color[2];
                 free(color);
+                free(curr);
             }
         }
     }
