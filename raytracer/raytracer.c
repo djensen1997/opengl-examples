@@ -47,15 +47,16 @@ static int ray_recurse = 0;
  * @author Dane Jensen                                                       *
  *****************************************************************************/
 Ray* getRay(Perspective* p, float* from, float* to){
-    //printf("Pixel Pos: ( %f, %f, %f )\n", pixel[0], pixel[1], pixel[2]);
+    //printf("Pixel Pos: ( %f, %f, %f )\n", to[0], to[1], to[2]);
     float vec[3];
     for(int i = 0; i < 3; i++){
         vec[i] = to[i] - from[i];
     }
+
     Ray* output = (Ray*)malloc(sizeof(Ray));
     vec_cpy(output->vector, vec, 3);
     vec3f_normalize(output->vector, output->vector);
-    vec_cpy(output->position, to, 3);
+    vec_cpy(output->position, from, 3);
     
     return output;
 }
@@ -91,10 +92,23 @@ unsigned char* getRayHit(Ray* ray, Scene* scene){
             out = hit->mat;
             vec_cpy(loc, hit->loc,3);
             vec_cpy(norm, hit->norm,3);
+            if(ray->vector[0] == 0 && ray->vector[1] == 0 && ray->vector[2] == -1){
+                printf("NORM:\t");
+                for(int i=0; i < 3; i++){
+                    printf("%f\t",norm[i]);
+                }
+                printf("\n");
+                printf("LOC:\t");
+                for(int i=0; i < 3; i++){
+                    printf("%f\t",loc[i]);
+                }
+                printf("\n");
+            }
+
             s = i;
             tri = -1;
         }
-        //free(hit);
+        free(hit);
     }
 
     //test triangles
@@ -118,7 +132,7 @@ unsigned char* getRayHit(Ray* ray, Scene* scene){
             tri = i;
             s = -1;
         }
-        //free(hit);
+        free(hit);
     }
 
     if(t != INT_MAX){
@@ -127,9 +141,9 @@ unsigned char* getRayHit(Ray* ray, Scene* scene){
             ray_recurse++;
             if(ray_recurse == 10){
                 ray_recurse = 0;
-                color[0] = 50;
-                color[1] = 50;
-                color[2] = 50;
+                color[0] = 20;
+                color[1] = 20;
+                color[2] = 20;
             }else{
                 //r = d - 2(d dot n) n
                 Ray* new = (Ray*) malloc(sizeof(Ray));
@@ -141,17 +155,24 @@ unsigned char* getRayHit(Ray* ray, Scene* scene){
                 for(int i = 0; i < 3; i++){
                     temp2[i] = norm[i] * temp;
                 }
+                 
 
                 vec3f_sub_vec3f(new->vector, ray->vector, temp2);
                 vec3f_normalize(new->vector, new->vector);
-                vec_cpy(new->vector,norm,3);
-
+                if(ray->vector[0] == 0 && ray->vector[1] == 0 && ray->vector[2] == -1){
+                    printf("REFLECTED:\t");
+                    for(int i = 0; i < 3; i++){
+                        printf("%f\t", new->vector[i]);
+                    }
+                    printf("\n");
+                }
+                //vec_cpy(new->vector, norm,3);
                 //dumpRay(new);
                 color = getRayHit(new, scene);
                 ray_recurse--;
-                //printf("Reflected ray Color: ");
-                /*printf("Color Dump: \n");*/
-                //printf("\t R %d, G %d, B %d\n",color[0],color[1],color[2]);
+                /*printf("Reflected ray Color: ");
+                printf("Color Dump: \n");
+                printf("\t R %d, G %d, B %d\n",color[0],color[1],color[2]);*/
                 free(new);
             }
             
@@ -239,17 +260,17 @@ void prepTestScene(Scene* scene){
     pos[0] = 0;
     pos[1] = 0;
     pos[2] = -3.3;
-    init_sphere(&(scene->spheres[0]), pos, .1, materials[0]);
+    init_sphere(&(scene->spheres[0]), pos, .3, materials[0]);
 
-    pos[0] = -.4;
+    pos[0] = -2;
     pos[1] = .1;
     pos[2] = -7;
-    init_sphere(&(scene->spheres[1]), pos, .3, materials[1]);
+    init_sphere(&(scene->spheres[1]), pos, 1, materials[1]);
 
-    pos[0] = .2;
-    pos[1] = -.1;
+    pos[0] = .5;
+    pos[1] = -.5;
     pos[2] = -5.7;
-    init_sphere(&(scene->spheres[2]), pos, .1, materials[2]);
+    init_sphere(&(scene->spheres[2]), pos, .3, materials[2]);
 
     float verts[9] = {
         -1, -1, -10,
@@ -313,14 +334,14 @@ void prepDKScene(Scene* scene){
     
     scene->light_loc[0] = 3;
     scene->light_loc[1] = 5;
-    scene->light_loc[2] = -15 * 5;
+    scene->light_loc[2] = -15;
     // make a material which is reflective
     // color is not used when material is reflective!
     // make several diffuse materials to choose from
 
     // create three spheres
 
-    float scale = 5;
+    float scale = 1;
     
     float pos1[3];
     pos1[0] = 0;
@@ -483,12 +504,14 @@ int main(int argc, char** argv){
         for(int j = 0; j < scene->screen_height; j++){
             {
                 float pixel[] = {
-                    ((float)j - scene->screen_height/2)/scene->screen_height/2,
+                    ((float)j - scene->screen_height/2)/(scene->screen_height/2),
 
-                    -((float)i - scene->screen_width/2)/scene->screen_width/2, 
+                    -((float)i - scene->screen_width/2)/(scene->screen_width/2), 
                     
                     -scene->dist_to_screen};
                 Ray* curr = getRay(scene, scene->camera_pos, pixel);
+                //dumpRay(curr);
+                //exit(0);
                 unsigned char* color = getRayHit(curr, test_scene);
                 c_img[i][j][0] = color[0];
                 c_img[i][j][1] = color[1];
@@ -498,9 +521,9 @@ int main(int argc, char** argv){
             }
             {
                 float pixel[] = {
-                    ((float)j - scene->screen_height/2)/scene->screen_height/2,
+                    ((float)j - scene->screen_height/2)/(scene->screen_height/2),
 
-                    -((float)i - scene->screen_width/2)/scene->screen_width/2, 
+                    -((float)i - scene->screen_width/2)/(scene->screen_width/2), 
                     
                     -scene->dist_to_screen};
                 Ray* curr = getRay(scene, scene->camera_pos, pixel);

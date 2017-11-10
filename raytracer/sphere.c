@@ -98,9 +98,9 @@ Ray_Hit*        intersect_sphere(Sphere* sphere, Ray* ray){
     //printf("Calculating the norm\n");
     vec3f_sub_vec3f(norm, loc, sphere->position);
     vec3f_normalize(norm, norm);
-    //printf("Normal: (%f, %f, %f)\n",norm[0],norm[1],norm[2]);
+    
     vec_cpy(output->norm, norm, 3);
-
+    //printf("Normal: (%f, %f, %f)\n",output->norm[0],output->norm[1],output->norm[2]);
     vec_cpy(output->loc, loc,3);
     //printf("Returning a hit\n");
     return output;
