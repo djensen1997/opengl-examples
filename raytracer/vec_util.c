@@ -63,7 +63,7 @@ float vec3f_dot_vec3f(float* v1, float* v2){
 
 void vec3f_normalize(float* dest, float* src){
     float length = sqrt(vec3f_dot_vec3f(src,src));
-    for(int i = 0; i < 4; i++){
+    for(int i = 0; i < 3; i++){
         dest[i] = src[i] / length;
     }
 }
