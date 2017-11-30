@@ -141,14 +141,14 @@ void prepTerrain(kuhl_geometry* geom, GLuint prog){
 	//SET THE VERTEX LOCATIONS//
 	GLfloat* vertexData = (GLfloat*)malloc(sizeof(GLfloat) * num_verticies * 3);
 	printf("vertex data malloced\n");
-	int i,j;
+	int i,j,offset=0;
 	for(i = 0; i < 2048; i++){//per col
 
 		for(j = 0; j < 1024; j++){//per row
-			int offset = (j + i * 2048) * 3;
-			vertexData[offset] = i;
-			vertexData[offset + 1] = j;
-			vertexData[offset + 2] = 2;
+			
+			vertexData[offset++] = i;
+			vertexData[offset++] = j;
+			vertexData[offset++] = 2;
 		}
 
 	}
@@ -160,7 +160,7 @@ void prepTerrain(kuhl_geometry* geom, GLuint prog){
 
 	//TELL THE PROGRAM THE TEXTURE COORDS//
 	GLfloat *texcoordData = (GLfloat*)malloc(sizeof(GLfloat) * 2048 * 1024 * 2);
-	int offset = 0;
+	offset = 0;
 	for (i = 0; i < 2048; i++){
 		for(j = 0; j < 1024; j++){
 			texcoordData[offset++] = (((float)i)/((float)2048));

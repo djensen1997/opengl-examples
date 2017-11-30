@@ -31,6 +31,7 @@ static float sv_angle = 0;
 static kuhl_geometry* duck;
 
 void calcOrder(int* output, float angle){
+  printf("calcOrder\n");
 	int temp = (int)((angle + .7 * std_angle) / std_angle);
 	int la=360,ra=720;
 	la -= temp * std_angle;
@@ -52,6 +53,7 @@ void calcOrder(int* output, float angle){
 			output[++i] = (ra % 360) / std_angle;
 		}
 	}
+	printf("finish calcOrder\n");
 }
 
 /* Called by GLFW whenever a key is pressed. */
@@ -86,7 +88,7 @@ void display()
 	for(int viewportID=0; viewportID<viewmat_num_viewports(); viewportID++)
 	{
 		viewmat_begin_eye(viewportID);
-
+		//printf("loop\n");
 		/* Where is the viewport that we are drawing onto and what is its size? */
 		int viewport[4]; // x,y of lower left corner, width, height
 		viewmat_get_viewport(viewport, viewportID);
@@ -137,6 +139,7 @@ void display()
 
 		//draw the duck
 		float model[16] = { 1,0,0,0,0,1,0,0,0,0,1,0,-.081,-.525,.022,1};
+		//printf("duck draw\n");
 		float d_scale[16];
 		//float rotMat[16];
 		//mat4f_rotateAxis_new(rotMat, angle, 0, 1, 0);
@@ -162,6 +165,7 @@ void display()
 		kuhl_errorcheck();
 		kuhl_geometry_draw(duck);
 		glUseProgram(0);
+		//printf("duck done\n");
 
 
 
@@ -178,21 +182,24 @@ void display()
 			
 			mat4f_mult_mat4f_new(&(modelview[i]), viewMat, &(modelview[i]));
 		}
-		
+		//printf("model views calced\n");
 		//order from farthest to closest
 		int order[num_images];
 		float tests[num_images];
+		//printf("%d \n", num_images);
 		for (int i = 0; i < num_images; i++){
 			tests[i] = -100000000;
 			order[i] = i;
 		}
 		
 		for(int i = 0; i<num_images; i++){
+		  //printf("order loop\n");
 			float test[4] = {0,0,0,1};
-			mat4f_mult_mat4f_new(test,&(modelview[i]),test);
+			mat4f_mult_vec4f_new(test,&(modelview[i]),test);
 			float norm = vec4f_norm(test);
 			int index = i;
 			for(int j = 0; j <= i; j++){
+			  //printf("%d %d %f\n",i,j,tests[j]);
 				if(tests[j] < norm){
 					float temp = tests[j];
 					int tempi = order[j];
@@ -208,8 +215,8 @@ void display()
 				}
 			}
 		}
-		/*
-		printf("Draw Order: ");
+	   
+		/*printf("Draw Order: ");
 		for (int i = 0; i < num_images; i++){
 			printf("%d  ", order[i]);
 		}
