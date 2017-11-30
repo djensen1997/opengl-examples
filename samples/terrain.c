@@ -23,6 +23,10 @@ static kuhl_geometry map;
 static char layer1[] = "../images/terrain.png";
 static char layer2[] = "../images/color_terrain.png";
 static char clouds[] = "../images/clouds.jpg";
+static GLfloat* texcoordData;
+static GLfloat* vertexData;
+static GLuint* indexData;
+
 
 
 void prepTerrain(kuhl_geometry* geom, GLuint prog);
@@ -89,14 +93,18 @@ void display()
 		float modelMatrix[16];
 		mat4f_scale_new(modelMatrix, (float)1/1024,(float)1/1024,1);
 
+		float translate[16];
+		mat4f_translate_new(translate, -1,-.5,.5);
+
 		/* Create a scale matrix. */
 		float scaleMatrix[16];
 		mat4f_scale_new(scaleMatrix, 3, 3, 3);
 
 		// Modelview = (viewMatrix * scaleMatrix) * rotationMatrix
 		float modelview[16];
-		mat4f_mult_mat4f_new(modelview, scaleMatrix, modelMatrix);
-		mat4f_mult_mat4f_new(modelview, modelview, viewMat);
+		mat4f_mult_mat4f_new(modelview, translate, modelMatrix);
+		mat4f_mult_mat4f_new(modelview, scaleMatrix, modelview);
+		mat4f_mult_mat4f_new(modelview, viewMat, modelview);
 
 		/* Tell OpenGL which GLSL program the subsequent
 		 * glUniformMatrix4fv() calls are for. */
@@ -139,7 +147,7 @@ void prepTerrain(kuhl_geometry* geom, GLuint prog){
 	printf("Geom made\n");
 
 	//SET THE VERTEX LOCATIONS//
-	GLfloat* vertexData = (GLfloat*)malloc(sizeof(GLfloat) * num_verticies * 3);
+	vertexData = (GLfloat*)malloc(sizeof(GLfloat) * num_verticies * 3);
 	printf("vertex data malloced\n");
 	int i,j,offset=0;
 	for(i = 0; i < 2048; i++){//per col
@@ -159,7 +167,8 @@ void prepTerrain(kuhl_geometry* geom, GLuint prog){
 
 
 	//TELL THE PROGRAM THE TEXTURE COORDS//
-	GLfloat *texcoordData = (GLfloat*)malloc(sizeof(GLfloat) * 2048 * 1024 * 2);
+	
+	texcoordData = (GLfloat*)malloc(sizeof(GLfloat) * 2048 * 1024 * 2);
 	offset = 0;
 	for (i = 0; i < 2048; i++){
 		for(j = 0; j < 1024; j++){
@@ -167,6 +176,14 @@ void prepTerrain(kuhl_geometry* geom, GLuint prog){
 			texcoordData[offset++] = (((float)j)/((float)1024));
 		}
 	}
+	
+	
+	/*GLfloat texcoordData[] = {
+		0,0,
+		1,0,
+		0,1,
+		1,1
+	};*/
 	kuhl_geometry_attrib(geom, texcoordData, 2, "in_TexCoord", KG_WARN);
 	kuhl_errorcheck();
 	printf("Tex coords added");
@@ -189,7 +206,7 @@ void prepTerrain(kuhl_geometry* geom, GLuint prog){
 
 	//INITIALIZE THE TRIANGES//
 	int num_triangles = 2047 * 1023 * 6;//the img is going to be 2048 x 1024, so the num triangles can be found like this
-	GLuint* indexData = (GLuint*)malloc(sizeof(GLuint) * num_triangles);
+	indexData = (GLuint*)malloc(sizeof(GLuint) * num_triangles);
 	int triangle = 0;
 	for(i = 0; i < 1023; i++){
 		for(j = 0; j < 2047; j++){
@@ -207,9 +224,6 @@ void prepTerrain(kuhl_geometry* geom, GLuint prog){
 	kuhl_geometry_indices(geom, indexData, 6);
 	kuhl_errorcheck();
 	printf("triangles initialized\n");
-	free(indexData);
-	free(vertexData);
-	free(texcoordData);
 	printf("Terrain Prepped\n");
 
 }
@@ -226,10 +240,11 @@ int main(int argc, char** argv)
 
 	/* Compile and link a GLSL program composed of a vertex shader and
 	 * a fragment shader. */
+	printf("pre shader compile\n");
 	program = kuhl_create_program("terrain.vert", "terrain.frag");
 	glUseProgram(program);
 	kuhl_errorcheck();
-
+	printf("programs compiled\n");
 	prepTerrain(&map, program);
 	
 	/* Good practice: Unbind objects until we really need them. */
@@ -250,6 +265,8 @@ int main(int argc, char** argv)
 		/* process events (keyboard, mouse, etc) */
 		glfwPollEvents();
 	}
-
+	//free(indexData);
+	//free(vertexData);
+	//free(texcoordData);
 	exit(EXIT_SUCCESS);
 }

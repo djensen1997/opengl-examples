@@ -9,9 +9,10 @@ uniform sampler2D clouds;
 
 void main() 
 {
-	if(true)
+	if(false)
 	{
 		fragColor = texture(color_terrain, out_TexCoord);
+		//fragColor = vec4(.8,0,0,1);
 	}
 	else
 	{
