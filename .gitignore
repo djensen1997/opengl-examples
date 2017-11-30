@@ -24,3 +24,7 @@ ivs-test-right.txt
 *.opensdf
 *.vcxproj*
 
+
+#other
+images/origional_images/*
+images/origional_images
