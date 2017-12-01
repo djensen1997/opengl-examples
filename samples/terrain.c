@@ -27,8 +27,8 @@ static GLfloat* texcoordData;
 static GLfloat* vertexData;
 static GLuint* indexData;
 static GLfloat* normalData;
-static float cam_pos[4] = {0,-.1,1,1};
-static float cam_look[3] = {0,-.5,3};
+static float cam_pos[4] = {0,-.1,.1,1};
+static float cam_look[3] = {0,-2,6};
 
 
 
@@ -92,25 +92,17 @@ void display()
 
 		/* Calculate an angle to rotate the camera. glfwGetTime() gets
 		 * the time in seconds since GLFW was initialized. Rotates 45 degrees every second. */
-		//float angle = fmodf((float) (glfwGetTime()*15.0), 360);
-		float angle = 0;
+		float angle = fmodf((float) (glfwGetTime()*45.0), 360);
+		//float angle = 0;
 		/* Create a 4x4 rotation matrix based on the angle we computed. */
 		float rotateMat[16] = {1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};
 		float cam_model[16];
-		float cam_translate[16] = {1,0,0,0,0,1,0,0,0,0,1,3,0,0,0,1};
+		float cam_translate[16] = {1,0,0,0,0,1,0,0,0,0,1,-3,0,0,0,1};
 		float curr_cam_pos[4];
-		//mat4f_translate_new(cam_translate, 0,0,3);
-		//mat4f_rotateAxis_new(rotateMat, angle, 0,sqrt(2),sqrt(2));
+		mat4f_translate_new(cam_translate, 0,-.8,4.9);
+		mat4f_rotateAxis_new(rotateMat, angle, 0,sqrt(2),sqrt(2));
 		mat4f_mult_mat4f_new(cam_model, cam_translate, rotateMat);
-		vec4f_mult_mat4f(curr_cam_pos, cam_model, cam_pos);
-		/*
-		for(int i=0; i<3; i++){
-			for(int j = 0; j < 3; j++){
-				curr_cam_pos[i] += cam_model[i * 3 + j] * cam_pos[j];
-			}
-		}
-		curr_cam_pos[3] = 1;*/
-		
+		mat4f_mult_vec4f_new(curr_cam_pos, cam_model, cam_pos);
 		mat4f_lookat_new(
 			viewMat, 
 			curr_cam_pos[0], curr_cam_pos[1], curr_cam_pos[2],
