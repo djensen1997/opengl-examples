@@ -18,14 +18,17 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
-static GLuint program = 0; /**< id value for the GLSL program */
-static kuhl_geometry map;
+static GLuint program = 0,cloud_prog=0; /**< id value for the GLSL program */
+static kuhl_geometry map,cloud;
 static char layer1[] = "../images/terrain.png";
 static char layer2[] = "../images/color_terrain.png";
 static char clouds[] = "../images/clouds.jpg";
 static GLfloat* texcoordData;
 static GLfloat* vertexData;
 static GLuint* indexData;
+static GLfloat* normalData;
+static float cam_pos[4] = {0,-.1,1,1};
+static float cam_look[3] = {0,-.5,3};
 
 
 
@@ -39,7 +42,6 @@ void keyboard(GLFWwindow* window, int key, int scancode, int action, int mods)
 	
 	switch(key)
 	{
-		case GLFW_KEY_Q:
 		case GLFW_KEY_ESCAPE:
 			glfwSetWindowShouldClose(window, GL_TRUE);
 			break;
@@ -87,14 +89,48 @@ void display()
 
 		/* Get the view or camera matrix; update the frustum values if needed. */
 		float viewMat[16], perspective[16];
-		viewmat_get(viewMat, perspective, viewportID);
+
+		/* Calculate an angle to rotate the camera. glfwGetTime() gets
+		 * the time in seconds since GLFW was initialized. Rotates 45 degrees every second. */
+		//float angle = fmodf((float) (glfwGetTime()*15.0), 360);
+		float angle = 0;
+		/* Create a 4x4 rotation matrix based on the angle we computed. */
+		float rotateMat[16] = {1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};
+		float cam_model[16];
+		float cam_translate[16] = {1,0,0,0,0,1,0,0,0,0,1,3,0,0,0,1};
+		float curr_cam_pos[4];
+		//mat4f_translate_new(cam_translate, 0,0,3);
+		//mat4f_rotateAxis_new(rotateMat, angle, 0,sqrt(2),sqrt(2));
+		mat4f_mult_mat4f_new(cam_model, cam_translate, rotateMat);
+		vec4f_mult_mat4f(curr_cam_pos, cam_model, cam_pos);
+		/*
+		for(int i=0; i<3; i++){
+			for(int j = 0; j < 3; j++){
+				curr_cam_pos[i] += cam_model[i * 3 + j] * cam_pos[j];
+			}
+		}
+		curr_cam_pos[3] = 1;*/
+		
+		mat4f_lookat_new(
+			viewMat, 
+			curr_cam_pos[0], curr_cam_pos[1], curr_cam_pos[2],
+			cam_look[0], cam_look[1], cam_look[2], 
+			 
+			0, 1, 0);
+		mat4f_perspective_new(perspective, 90, 1, .1, 100);
 
 		//transform from object coodinates to world coordinates (puts it into a 2x2x2 box)
 		float modelMatrix[16];
 		mat4f_scale_new(modelMatrix, (float)1/1024,(float)1/1024,1);
 
 		float translate[16];
-		mat4f_translate_new(translate, -1,-.5,.5);
+		mat4f_translate_new(translate, -1,-.5,0);
+
+		float translate2[16];
+		mat4f_translate_new(translate2,0,-.5,2);
+
+		float rotate[16];
+		mat4f_rotateAxis_new(rotate, -90, 1, 0, 0);
 
 		/* Create a scale matrix. */
 		float scaleMatrix[16];
@@ -103,6 +139,8 @@ void display()
 		// Modelview = (viewMatrix * scaleMatrix) * rotationMatrix
 		float modelview[16];
 		mat4f_mult_mat4f_new(modelview, translate, modelMatrix);
+		mat4f_mult_mat4f_new(modelview, rotate, modelview);
+		mat4f_mult_mat4f_new(modelview, translate2, modelview);
 		mat4f_mult_mat4f_new(modelview, scaleMatrix, modelview);
 		mat4f_mult_mat4f_new(modelview, viewMat, modelview);
 
@@ -126,6 +164,25 @@ void display()
 		/* Draw the geometry using the matrices that we sent to the
 		 * vertex programs immediately above */
 		kuhl_geometry_draw(&map);
+
+		glUseProgram(cloud_prog);
+
+		mat4f_mult_mat4f_new(modelview, viewMat, scaleMatrix);
+
+		/* Send the perspective projection matrix to the vertex program. */
+		glUniformMatrix4fv(kuhl_get_uniform("Projection"),
+		                   1, // number of 4x4 float matrices
+		                   0, // transpose
+		                   perspective); // value
+		/* Send the modelview matrix to the vertex program. */
+		glUniformMatrix4fv(kuhl_get_uniform("ModelView"),
+		                   1, // number of 4x4 float matrices
+		                   0, // transpose
+		                   modelview); // value
+		kuhl_errorcheck();
+		/* Draw the geometry using the matrices that we sent to the
+		 * vertex programs immediately above */
+		kuhl_geometry_draw(&cloud);
 
 		glUseProgram(0); // stop using a GLSL program.
 		viewmat_end_eye(viewportID);
@@ -156,7 +213,7 @@ void prepTerrain(kuhl_geometry* geom, GLuint prog){
 			
 			vertexData[offset++] = i;
 			vertexData[offset++] = j;
-			vertexData[offset++] = 2;
+			vertexData[offset++] = 0;
 		}
 
 	}
@@ -164,6 +221,19 @@ void prepTerrain(kuhl_geometry* geom, GLuint prog){
 	kuhl_geometry_attrib(geom, vertexData, 3, "in_Position", KG_WARN);
 	kuhl_errorcheck();
 	printf("Vertex locations set\n");
+
+	//SET THE DUMMY NORMALS//
+	normalData = (GLfloat *)malloc(sizeof(GLfloat) * num_verticies * 3);
+	printf("Setting normals\n");
+	offset = 0;
+	for(i = 0; i < 2048; i++){
+		for(j = 0; j < 1024; j++){
+			normalData[offset++] = 0;
+			normalData[offset++] = 0;
+			normalData[offset++] = 1;
+		}
+	}
+	printf("Normals Set\n");
 
 
 	//TELL THE PROGRAM THE TEXTURE COORDS//
@@ -186,7 +256,7 @@ void prepTerrain(kuhl_geometry* geom, GLuint prog){
 	};*/
 	kuhl_geometry_attrib(geom, texcoordData, 2, "in_TexCoord", KG_WARN);
 	kuhl_errorcheck();
-	printf("Tex coords added");
+	printf("Tex coords added\n");
 
 	//LOAD THE TERRAINS//
 	GLuint texId[] = {0,0,0};
@@ -198,34 +268,65 @@ void prepTerrain(kuhl_geometry* geom, GLuint prog){
 	kuhl_geometry_texture(geom, texId[1], "color_terrain", KG_WARN);
 	printf("Color terrain loaded\n");
 	kuhl_errorcheck();
-	kuhl_read_texture_file(clouds, &(texId[2]));
-	kuhl_geometry_texture(geom, texId[2], "clouds", KG_WARN);
-	printf("clouds loaded\n");
-	kuhl_errorcheck();
 	
 
 	//INITIALIZE THE TRIANGES//
 	int num_triangles = 2047 * 1023 * 6;//the img is going to be 2048 x 1024, so the num triangles can be found like this
 	indexData = (GLuint*)malloc(sizeof(GLuint) * num_triangles);
 	int triangle = 0;
-	for(i = 0; i < 1023; i++){
-		for(j = 0; j < 2047; j++){
+	for(i = 0; i < 2047; i++){
+		for(j = 0; j < 1023; j++){
 			//triangle 1
-			indexData[triangle++] = j 	+ i 	* 2048;
-			indexData[triangle++] = j 	+ (i+1) * 2048;
-			indexData[triangle++] = j+1 + i 	* 2048;
+			indexData[triangle++] = j 	+ i 	* 1023;
+			indexData[triangle++] = j 	+ (i+1) * 1023;
+			indexData[triangle++] = j+1 + i 	* 1023;
 
 			//triangle 2
-			indexData[triangle++] = j+1 + i 	* 2048;
-			indexData[triangle++] = j 	+ (i+1) * 2048;
-			indexData[triangle++] = j+1 + (i+1) * 2048;
+			indexData[triangle++] = j+1 + i 	* 1023;
+			indexData[triangle++] = j 	+ (i+1) * 1023;
+			indexData[triangle++] = j+1 + (i+1) * 1023;
 		}
 	}
-	kuhl_geometry_indices(geom, indexData, 6);
+	kuhl_geometry_indices(geom, indexData, num_triangles);
 	kuhl_errorcheck();
 	printf("triangles initialized\n");
 	printf("Terrain Prepped\n");
 
+}
+
+void initCloudQuad(kuhl_geometry* geom, GLuint prog){
+	kuhl_geometry_new(geom, prog, 4, GL_TRIANGLES);
+	//printf("Making a quad\n");
+	kuhl_errorcheck();
+	GLfloat texcoordData[] = {0, 0,
+	                          1, 0,
+							  1, 1,
+							  0, 1 };
+	kuhl_geometry_attrib(geom, texcoordData, 2, "in_TexCoord", KG_WARN);
+	kuhl_errorcheck();
+	// The 2 parameter above means each texture coordinate is a 2D coordinate.
+	
+	GLfloat vertexData[16] = {	-1, -.3, 1.5,
+								1, -.3, 1.5,
+								1, -.3, 2.5,
+								-1, -.3, 2.5};
+
+	kuhl_geometry_attrib(geom, vertexData, 3, "in_Position", KG_WARN);
+	kuhl_errorcheck();
+	// The 3 parameter above means that each vertex position is a 3D coordinate.
+
+	GLuint texId = 0;
+	kuhl_read_texture_file(clouds, &texId);
+	kuhl_geometry_texture(geom, texId, "clouds", KG_WARN);
+	kuhl_errorcheck();
+
+	GLuint indexData[] = {
+		0,1,2,
+		0,3,2
+	};
+	kuhl_geometry_indices(geom, indexData, 6);
+
+	kuhl_errorcheck();
 }
 
 
@@ -233,7 +334,7 @@ int main(int argc, char** argv)
 {
 	/* Initialize GLFW and GLEW */
 	kuhl_ogl_init(&argc, argv, 512, 512, 32, 4);
-
+	printf("Stuff initialized\n");
 	/* Specify function to call when keys are pressed. */
 	glfwSetKeyCallback(kuhl_get_window(), keyboard);
 	// glfwSetFramebufferSizeCallback(window, reshape);
@@ -242,20 +343,22 @@ int main(int argc, char** argv)
 	 * a fragment shader. */
 	printf("pre shader compile\n");
 	program = kuhl_create_program("terrain.vert", "terrain.frag");
+	cloud_prog = kuhl_create_program("terrain-cloud.vert", "terrain-cloud.frag");
 	glUseProgram(program);
 	kuhl_errorcheck();
 	printf("programs compiled\n");
 	prepTerrain(&map, program);
 	
 	/* Good practice: Unbind objects until we really need them. */
+	glUseProgram(cloud_prog);
+	kuhl_errorcheck();
+	initCloudQuad(&cloud, cloud_prog);
 	glUseProgram(0);
 
 	dgr_init();     /* Initialize DGR based on environment variables. */
 
-	float initCamPos[3]  = {0,0,10}; // location of camera
-	float initCamLook[3] = {0,0,0}; // a point the camera is facing at
 	float initCamUp[3]   = {0,1,0}; // a vector indicating which direction is up
-	viewmat_init(initCamPos, initCamLook, initCamUp);
+	viewmat_init(cam_pos,cam_look, initCamUp);
 	
 	while(!glfwWindowShouldClose(kuhl_get_window()))
 	{
@@ -265,8 +368,9 @@ int main(int argc, char** argv)
 		/* process events (keyboard, mouse, etc) */
 		glfwPollEvents();
 	}
-	//free(indexData);
-	//free(vertexData);
-	//free(texcoordData);
+	free(indexData);
+	free(vertexData);
+	free(texcoordData);
+	free(normalData);
 	exit(EXIT_SUCCESS);
 }
