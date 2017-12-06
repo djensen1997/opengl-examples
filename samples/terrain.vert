@@ -44,8 +44,7 @@ void main(){
 	out_Normal.x = -(U.y * V.z - U.z * V.y);
 	out_Normal.y = -(U.z * V.x - U.x * V.z);
 	out_Normal.z = U.x * V.y - U.y * V.x; 
-	//out_Normal.x = 0;
-	//out_Normal.z = 0;
+	
 	mat3 NormalMatrix = transpose(inverse(mat3(ModelView)));
 	out_Normal = NormalMatrix * normalize(out_Normal).xyz;
 	out_lightDir = lightPosition - pos.xyz;

@@ -32,7 +32,7 @@ if(NOT WIN32)
 # Options which we may add in future (not supported by older compilers):
 # -Wshadow should probably be added eventually
 # -Wvla should be included because Visual Studio does not support VLAs, so we avoid using them. They are optional in C11 even though they were part of C99.
-set (COMMON_FLAGS " -Wall -Wextra -pedantic -g -Wformat -Wno-unused-parameter -Wno-unused-function -fsanitize=address") # used for C and C++
+set (COMMON_FLAGS " -Wall -Wextra -pedantic -g -Wformat -Wno-unused-parameter -Wno-unused-function") # used for C and C++
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${COMMON_FLAGS} -std=gnu99 -Wno-deprecated-declarations")
 
 # Use no-variadic-macros to prevent C++ programs from warning about the variadic msg() macro
