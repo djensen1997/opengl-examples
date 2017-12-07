@@ -16,7 +16,8 @@
 
 #include "libkuhl.h"
 
-static GLuint program = 0; /**< id value for the GLSL program */
+static GLuint program = 0;
+static GLuint road_prog = 0; /**< id value for the GLSL program */
 
 /*
  *
@@ -43,7 +44,7 @@ typedef struct block{
 Building* generateSmallBuilding(GLuint prog, float x, float y, float z);
 Block* generateBlock(GLuint prog, float x, float y, float z);
 void drawBuilding(Building* build);
-void drawBlock(Block* object, float* viewMat);
+void drawBlock(Block* object, float* viewMat, float* perspective);
 void destroyBlock(Block* object);
 void updateViewer();
 
@@ -230,20 +231,10 @@ void display()
 		/* Tell OpenGL which GLSL program the subsequent
 		 * glUniformMatrix4fv() calls are for. */
 		kuhl_errorcheck();
-		glUseProgram(program);
-		kuhl_errorcheck();
-		
-		/* Send the perspective projection matrix to the vertex program. */
-		glUniformMatrix4fv(kuhl_get_uniform("Projection"),
-		                   1, // number of 4x4 float matrices
-		                   0, // transpose
-		                   perspective); // value
-		
-		kuhl_errorcheck();
 		/* Draw the geometry using the matrices that we sent to the
 		 * vertex programs immediately above */
 		for(int i = 0; i < max_blocks; i++){
-			drawBlock(wall, viewMat);
+			drawBlock(wall, viewMat, perspective);
 		}
 		
 		glUseProgram(0); // stop using a GLSL program.
@@ -358,8 +349,9 @@ void drawBuilding(Building* build){
 	}
 }
 
-void drawBlock(Block* object, float* viewMat){
+void drawBlock(Block* object, float* viewMat, float* perspective){
 	//draw buildings
+	glUseProgram(program);
 	for(int i = 0; i < 4; i++){
 		float modelview[16];
 		mat4f_mult_mat4f_new(modelview,viewMat,object->buildings[i]->modelMat);
@@ -368,17 +360,17 @@ void drawBlock(Block* object, float* viewMat){
 		    1, // number of 4x4 float matrices
 		    0, // transpose
 			modelview); // value
+		glUniformMatrix4fv(kuhl_get_uniform("Projection"),
+			1,
+			0,
+			perspective);
 		kuhl_errorcheck();
 		drawBuilding(object->buildings[i]);
 	}
 
-
+	glUseProgram(0);
 	//draw road
-	float color = object->road_color;
-	glUniform1f(
-		kuhl_get_uniform("color"),	//tells it what attribute to set
-		color						//tells it what to set the attribute
-	);
+	glUseProgram(road_prog);
 	float modelview[16];
 	mat4f_mult_mat4f_new(modelview,viewMat,object->modelMat);
 	/* Send the modelview matrix to the vertex program. */
@@ -386,8 +378,13 @@ void drawBlock(Block* object, float* viewMat){
 	    1, // number of 4x4 float matrices
 	    0, // transpose
 		modelview); // value
+	glUniformMatrix4fv(kuhl_get_uniform("Projection"),
+			1,
+			0,
+			perspective);
 	kuhl_errorcheck();
 	kuhl_geometry_draw(&(object->road));
+	glUseProgram(0);
 }
 
 /*	
@@ -751,42 +748,51 @@ Block* generateBlock(GLuint prog, float x, float y, float z){
 	Block* output = malloc(sizeof(Block));
 	float road_width = building_width / 2;
 	output->buildings = (Building**)malloc(sizeof(Building*)*4);
+	glUseProgram(0);
+	glUseProgram(road_prog);
 	//code to make the road
 
 	{
 		//modified code from the racecar assignment
-		kuhl_geometry_new(&(output->road),prog,4,GL_TRIANGLES);
-		output->road_color = 1.0;
+		kuhl_geometry_new(&(output->road),road_prog,4,GL_TRIANGLES);
 		float height = 1;
 		//sets the verticies for a rectangular prism with a square base and
 		//a variable height
 		//centered on the origin
 		GLfloat vertexPositions[] = {
-			-building_width * 1.75,
+			-building_width * 1.5,
 			height,
-			-building_width * 1.75,
+			-building_width * 1.5,
 
-			building_width * 1.75,
+			building_width * 1.5,
 			height,
-			-building_width * 1.75,
+			-building_width * 1.5,
 
-			-building_width * 1.75,
+			-building_width * 1.5,
 			height,
-			building_width * 1.75,
+			building_width * 1.5,
 
-			building_width * 1.75,
+			building_width * 1.5,
 			height,
-			building_width * 1.75,
+			building_width * 1.5
 		};
 
 		//sets the normals for the cube
 		kuhl_geometry_attrib(&(output->road),vertexPositions,3,"in_Position",KG_WARN);
+
+		GLfloat texcoordData[] = {
+				0, 0,
+	            1, 0,
+				0, 1,
+	        	1, 1 };
+		kuhl_geometry_attrib(&(output->road), texcoordData, 2, "in_TexCoord", KG_WARN);
+
 		GLfloat normalData[] = {
 			//front
 			0, 1, 0,
 			0, 1, 0,
 			0, 1, 0,
-			0, 1, 0,
+			0, 1, 0
 		};
 
 		kuhl_geometry_attrib(&(output->road), normalData,3,"in_Normal",KG_WARN);
@@ -797,9 +803,15 @@ Block* generateBlock(GLuint prog, float x, float y, float z){
 			};
 		kuhl_geometry_indices(&(output->road), indexData, 6);
 		
+		/* Load the texture. It will be bound to texId */	
+		GLuint texId = 0;
+		kuhl_read_texture_file("../images/road.png", &texId);
+		/* Tell this piece of geometry to use the texture we just loaded. */
+		kuhl_geometry_texture(&(output->road), texId, "tex", KG_WARN);
 
 		kuhl_errorcheck();
 	}
+	glUseProgram(prog);
 
 	//code to make the buildings
 	float x_shift = building_width * .75;
@@ -871,7 +883,7 @@ int main(int argc, char** argv)
 	/* Compile and link a GLSL program composed of a vertex shader and
 	 * a fragment shader. */
 	program = kuhl_create_program("infinicity.vert", "infinicity.frag");
-
+	road_prog = kuhl_create_program("infinicity-road.vert", "infinicity-road.frag");
 	/* Use the GLSL program so subsequent calls to glUniform*() send the variable to
 	   the correct program. */
 	glUseProgram(program);
