@@ -42,11 +42,16 @@ typedef struct block{
 	float road_color;
 }Block;
 Building* generateSmallBuilding(GLuint prog, float x, float y, float z);
-Block* generateBlock(GLuint prog, float x, float y, float z);
+Block* generateBlock(float x, float y, float z);
 void drawBuilding(Building* build);
 void drawBlock(Block* object, float* viewMat, float* perspective);
 void destroyBlock(Block* object);
 void updateViewer();
+int viewer_in(Block* test);
+void expandRow(int dir);
+void expandColumn(int dir);
+Block** generateRow(float x, float y, float z);
+Block** generateColumn(float x, float y, float z);
 
 typedef struct viewer{
 	float start_pos[3];
@@ -61,12 +66,15 @@ typedef struct viewer{
 //static float min_height = 1.0;
 //static float max_height = 10.0;
 static float building_width = 5.0;
-static Block* wall;
-static int max_blocks = 1;//should be a square number (i.e 1,4,9,16,25...)
+static Block* map[9];
+static int max_blocks = 9;//should be a square number (i.e 1,4,9,16,25...)
 static Viewer you;
 static int dirs[4];
 static float last_frame;
 static float curr_frame;
+static int row = -1;
+static int col = 0;
+static int debug = 0;
 
 /* Called by GLFW whenever a key is pressed. */
 void keyboard(GLFWwindow* window, int key, int scancode, int action, int mods)
@@ -221,20 +229,27 @@ void display()
 			you.curr_look[0], you.curr_look[1], you.curr_look[2], 
 			 
 			0, 1, 0);
-		mat4f_perspective_new(perspective, 90, 1, .1, 100);
-
-
-
-		//BUILD A WALL
-		
+		mat4f_perspective_new(perspective, 70, 1, .1, 100);
 
 		/* Tell OpenGL which GLSL program the subsequent
 		 * glUniformMatrix4fv() calls are for. */
 		kuhl_errorcheck();
 		/* Draw the geometry using the matrices that we sent to the
 		 * vertex programs immediately above */
+		if(debug == 1){
+			printf("row = %d\n", row);
+		}
 		for(int i = 0; i < max_blocks; i++){
-			drawBlock(wall, viewMat, perspective);
+			if(debug == 1){
+				printf("drawing block %d\n", i);
+			}
+			drawBlock(map[i], viewMat, perspective);
+			if(debug == 1){
+				printf("done drawing block %d\n",i); 
+			}
+		}
+		if(debug == 1){
+			debug = 0;
 		}
 		
 		glUseProgram(0); // stop using a GLSL program.
@@ -261,13 +276,13 @@ void updateViewer(){
 	float y_speed = 45; //rotates the look point up 45 degrees per second
 	float x_speed = 180;	//rotates the look point left or right 45 degrees per second
 	you.xangle = fmod(time_diff * x_speed * dirs[1] + you.xangle, 360);
-	you.yangle = fmod(time_diff * y_speed * dirs[2] + you.yangle, 360);
+	you.yangle = fmod(time_diff * y_speed * dirs[2] * -1 + you.yangle, 360);
 	float look_model[16], yrotate[16], xrotate[16];
 	mat4f_rotateAxis_new(yrotate,you.yangle, 1, 0, 0);
 	mat4f_rotateAxis_new(xrotate,you.xangle, 0, 1, 0);
 
 	//calculate the new angle
-	mat4f_mult_mat4f_new(look_model, yrotate, xrotate);
+	mat4f_mult_mat4f_new(look_model,xrotate, yrotate);
 	//holds the rotated look point
 	float temp[4];
 	temp[0] = you.start_look[0];
@@ -320,31 +335,139 @@ void updateViewer(){
 	for(int i = 0; i < 3; i++){
 		you.curr_pos[i] = temp[i];
 	}
+
+	//map[max_blocks/2] should always be the middle of the map
+	//returns 0 if the viewer has moved out of the center of the map
+	int expand = viewer_in(map[max_blocks/2]);
+	
+	if(expand == 1){
+		//expand with a new row in the negative z
+		printf("expanding map\n");
+		expandRow(-1);
+		printf("map expanded\n");
+	}else if(expand == 2){
+		//expand with a new row in the positive z
+		printf("expanding map\n");
+		expandRow(1);
+		printf("map expanded\n");
+	}else if(expand == 3){
+		//expand with a new column in the negative x
+		//printf("expanding map\n");
+		//expandColumn(-1);
+		//printf("map expanded\n");
+	}else if(expand == 4){
+		//expand with a new column in the positive x
+		//printf("expanding map\n");
+		//expandColumn(1);
+		//printf("map expanded\n");
+	}else{
+		//don't expand
+	}
+	
+
 	last_frame = curr_frame;
+}
+
+int viewer_in(Block* test){
+	float* model = test->modelMat;
+	//extract the x,y,z coordinates of the test block
+	float x = model[3];
+	float z = model[11];
+	if(you.translate[0] < x - building_width*1.5){
+		col--;
+		return 3;
+	}else if(you.translate[0] > x + building_width*1.5){
+		//not within the xcoords of the middle block
+		//add a column
+		col++;
+		return 4;
+	}else if(you.translate[2] < z - building_width*1.5){
+		row --;
+		return 1;
+	}else if(you.translate[2] > z + building_width*1.5){
+		//not within the zcoords of the middle block
+		//add a row
+		row ++;
+		return 2;
+	}
+	return 0;
+}
+
+void expandRow(int dir){
+	if(dir != -1 && dir != 1){
+		printf("ERROR: INCORRECT ROW DIRRECTION\n");
+		return;
+	}
+	float offset[3] = {0,0,0};
+	offset[0] = col * building_width * 3;//x offset
+	offset[1] = -2;
+	offset[2] = (row+dir) * building_width * 3;
+	Block** new_row = generateRow(offset[0], offset[1], offset[2]);
+	printf("new row generated\n");
+	row += dir;
+	switch(dir){
+		case 1:
+			printf("putting the row on the positive direction\n");
+			//since we are moving in the positive direction, 
+			//shift the last 6 blocks up by 3
+			for(int i = 0; i < 6; i++){
+				map[i] = map[i+3];
+			}
+			printf("saved blocks shifted\n");
+			//put the new blocks on the map
+			for(int i = 6; i < 9; i++){
+				//destroyBlock(map[i]);
+				map[i] = new_row[i-6];
+			}
+			printf("new pieces added, old pieces freed\n");
+			break;
+		case -1:
+			printf("putting the row on the negative direction\n");
+			//since we are moving in the negative direction, 
+			//shift the first 6 blocks up by 3
+			for(int i = 8; i > 2; i--){
+				map[i] = map[i-3];
+			}
+			printf("saved blocks shifted\n");
+			//put the new blocks on the map
+			for(int i = 0; i < 3; i++){
+				//destroyBlock(map[i]);
+				map[i] = new_row[i];
+			}
+			printf("new pieces added, old ones freed\n");
+			break;
+		default:
+			printf("ERROR: WHY WASN'T THIS CAUGHT EARLIER\n");
+			break;
+	}
+	printf("freeing temp datastruct\n");
+	free(new_row);
+	//debug = 1;
 }
 
 void drawBuilding(Building* build){
 	int i = 0;
 	int iter = 1 + (int)build->width * (int)build->height * 4;
+	if(debug == 1){
+		printf("drawing the quads\n");
+	}
+	
 	for(i = 0; i < iter; i++){
-		//sets color ether green or black
+		float color;
 		if(i == 0){
-			//sets color to grey
-			float color = 0.0;
-			glUniform1f(
-				kuhl_get_uniform("color"),	//tells it what attribute to set
-				color						//tells it what to set the attribute
-			);
+			color = 0.0;
 		}else{
-			float color = (float)(i % 3);
+			//sets color ether green or black
+			color = (float)(i % 3);
 			if(color != 2.0){
 				color = 1.0;
 			}
-			glUniform1f(
-				kuhl_get_uniform("color"),	//tells it what attribute to set
-				color						//tells it what to set the attribute
-			);
 		}
+		
+		glUniform1f(
+			kuhl_get_uniform("color"),	//tells it what attribute to set
+			color						//tells it what to set the attribute
+		);
 		kuhl_geometry_draw(&(build->quads[i]));
 	}
 }
@@ -352,19 +475,25 @@ void drawBuilding(Building* build){
 void drawBlock(Block* object, float* viewMat, float* perspective){
 	//draw buildings
 	glUseProgram(program);
-	for(int i = 0; i < 4; i++){
-		float modelview[16];
-		mat4f_mult_mat4f_new(modelview,viewMat,object->buildings[i]->modelMat);
-		/* Send the modelview matrix to the vertex program. */
-		glUniformMatrix4fv(kuhl_get_uniform("ModelView"),
-		    1, // number of 4x4 float matrices
-		    0, // transpose
-			modelview); // value
-		glUniformMatrix4fv(kuhl_get_uniform("Projection"),
+	glUniformMatrix4fv(kuhl_get_uniform("Projection"),
 			1,
 			0,
 			perspective);
 		kuhl_errorcheck();
+	for(int i = 0; i < 4; i++){
+		float modelview[16];
+		if(debug == 1){
+			printf("drawing building %d\n", i);
+		}
+		mat4f_mult_mat4f_new(modelview,viewMat,object->buildings[i]->modelMat);
+		// Send the modelview matrix to the vertex program.
+		glUniformMatrix4fv(kuhl_get_uniform("ModelView"),
+		    1, 			// number of 4x4 float matrices
+		    0, 			// transpose
+			modelview); // value
+		if(debug == 1){
+			printf("modelview sent\n");
+		}
 		drawBuilding(object->buildings[i]);
 	}
 
@@ -528,7 +657,14 @@ Building* generateSmallBuilding(GLuint prog, float x, float y, float z){
 			};
 		kuhl_geometry_indices(geom, indexData, 36);
 		/* Set the uniform variable in the shader that is named "red" to the value 1. */
-		
+		float color = 0.0;
+		kuhl_geometry_attrib(
+			geom,
+			&color,						//tells it what to set the attribute
+			1,
+			"color",					//tells it what attribute to set
+			KG_WARN
+		);
 
 		kuhl_errorcheck();
 	}
@@ -581,8 +717,6 @@ Building* generateSmallBuilding(GLuint prog, float x, float y, float z){
 			0, 2, 3,
 			};
 		kuhl_geometry_indices(&(output->quads[i+1]), indexData, 6);
-		
-
 		kuhl_errorcheck();
 	}
 	//puts windows on the front of the building
@@ -613,7 +747,7 @@ Building* generateSmallBuilding(GLuint prog, float x, float y, float z){
 			-height/2 + j/((int)building_width) + .97,
 			building_width/2 + .01//D
 		};
-
+		
 		//sets the normals for the cube
 		kuhl_geometry_attrib(&(output->quads[i+1]),vertexPositions,3,"in_Position",KG_WARN);
 		GLfloat normalData[] = {
@@ -623,7 +757,7 @@ Building* generateSmallBuilding(GLuint prog, float x, float y, float z){
 			0, 0, 1,
 			0, 0, 1,
 		};
-
+		
 		kuhl_geometry_attrib(&(output->quads[i+1]), normalData,3,"in_Normal",KG_WARN);
 		GLuint indexData[] = { 
 			//front
@@ -631,6 +765,19 @@ Building* generateSmallBuilding(GLuint prog, float x, float y, float z){
 			0, 2, 3,
 			};
 		kuhl_geometry_indices(&(output->quads[i+1]), indexData, 6);
+		
+		//sets color ether green or black
+		float color = (float)(i % 3);
+		if(color != 2.0){
+			color = 1.0;
+		}
+		kuhl_geometry_attrib(
+			&(output->quads[i+1]),
+			&color,						//tells it what to set the attribute
+			1,
+			"color",					//tells it what attribute to set
+			KG_WARN
+		);
 		
 
 		kuhl_errorcheck();
@@ -683,6 +830,20 @@ Building* generateSmallBuilding(GLuint prog, float x, float y, float z){
 			};
 		kuhl_geometry_indices(&(output->quads[i+1]), indexData, 6);
 		
+		//sets color ether green or black
+		
+		float color = (float)(i % 3);
+		if(color != 2.0){
+			color = 1.0;
+		}
+		kuhl_geometry_attrib(
+			&(output->quads[i+1]),
+			&color,						//tells it what to set the attribute
+			1,
+			"color",					//tells it what attribute to set
+			KG_WARN
+		);
+		
 
 		kuhl_errorcheck();
 	}
@@ -734,6 +895,19 @@ Building* generateSmallBuilding(GLuint prog, float x, float y, float z){
 			};
 		kuhl_geometry_indices(&(output->quads[i+1]), indexData, 6);
 		
+		//sets color ether green or black
+		float color = (float)(i % 3);
+		if(color != 2.0){
+			color = 1.0;
+		}
+		kuhl_geometry_attrib(
+			&(output->quads[i+1]),
+			&color,						//tells it what to set the attribute
+			1,
+			"color",					//tells it what attribute to set
+			KG_WARN
+		);
+		
 
 		kuhl_errorcheck();
 	}
@@ -743,10 +917,11 @@ Building* generateSmallBuilding(GLuint prog, float x, float y, float z){
 	return output;
 }
 
-Block* generateBlock(GLuint prog, float x, float y, float z){
+Block* generateBlock(float x, float y, float z){
 	int type = 0;//will detirmine the contents of the block (range 0-15)
+
+	type = type % 16;
 	Block* output = malloc(sizeof(Block));
-	float road_width = building_width / 2;
 	output->buildings = (Building**)malloc(sizeof(Building*)*4);
 	glUseProgram(0);
 	glUseProgram(road_prog);
@@ -786,7 +961,7 @@ Block* generateBlock(GLuint prog, float x, float y, float z){
 				0, 1,
 	        	1, 1 };
 		kuhl_geometry_attrib(&(output->road), texcoordData, 2, "in_TexCoord", KG_WARN);
-
+		/*
 		GLfloat normalData[] = {
 			//front
 			0, 1, 0,
@@ -794,8 +969,8 @@ Block* generateBlock(GLuint prog, float x, float y, float z){
 			0, 1, 0,
 			0, 1, 0
 		};
+		kuhl_geometry_attrib(&(output->road), normalData,3,"in_Normal",KG_WARN);*/
 
-		kuhl_geometry_attrib(&(output->road), normalData,3,"in_Normal",KG_WARN);
 		GLuint indexData[] = { 
 			//front
 			0, 1, 3,  
@@ -811,42 +986,46 @@ Block* generateBlock(GLuint prog, float x, float y, float z){
 
 		kuhl_errorcheck();
 	}
-	glUseProgram(prog);
+	glUseProgram(program);
 
 	//code to make the buildings
 	float x_shift = building_width * .75;
 	float z_shift = building_width * .75;
 	float y_shift = 5;
 	//building on the far left
-	if(type % 2 == 0){
+	if(type >= 1 ){
 		//generate simple building
-		output->buildings[0] = generateSmallBuilding(prog, -x_shift, y_shift, -z_shift);
+		output->buildings[0] = generateSmallBuilding(program, -x_shift, y_shift, -z_shift);
 	}else{
 		//generate complex building
+		output->buildings[0] = generateSmallBuilding(program, -x_shift, y_shift, -z_shift);
 	}
 
 	//far right
-	if(type % 4 == 0){
+	if(type >= 3){
 		//generate simple building
-		output->buildings[1] = generateSmallBuilding(prog, x_shift, y_shift, -z_shift);
+		output->buildings[1] = generateSmallBuilding(program, x_shift, y_shift, -z_shift);
 	}else{
 		//generate complex building
+		output->buildings[1] = generateSmallBuilding(program, x_shift, y_shift, -z_shift);
 	}
 
 	//close left
-	if(type % 8 == 0){
+	if(type >= 7){
 		//generate simple building
-		output->buildings[2] = generateSmallBuilding(prog, -x_shift, y_shift, z_shift);
+		output->buildings[2] = generateSmallBuilding(program, -x_shift, y_shift, z_shift);
 	}else{
 		//generate complex building
+		output->buildings[2] = generateSmallBuilding(program, -x_shift, y_shift, z_shift);
 	}
 
 	//close right
-	if(type%16 == 0){
+	if(type>= 15){
 		//generate simple building
-		output->buildings[3] = generateSmallBuilding(prog, x_shift, y_shift, z_shift);
+		output->buildings[3] = generateSmallBuilding(program, x_shift, y_shift, z_shift);
 	}else{
 		//generate complex building
+		output->buildings[3] = generateSmallBuilding(program, x_shift, y_shift, z_shift);
 	}
 
 	output->modelMat = (float*)malloc(sizeof(float) * 16);
@@ -858,6 +1037,16 @@ Block* generateBlock(GLuint prog, float x, float y, float z){
 		mat4f_mult_mat4f_new(output->buildings[i]->modelMat, output->modelMat, output->buildings[i]->modelMat);
 	}
 
+	return output;
+}
+
+
+Block** generateRow(float x, float y, float z){
+	Block** output = (Block**)malloc(sizeof(Block*) * 3);
+	for(int i = -1; i < 2;i++){
+		Block* temp = generateBlock(x + 3 * building_width * i,y,z);
+		output[i+1] = temp;
+	}
 	return output;
 }
 
@@ -888,11 +1077,25 @@ int main(int argc, char** argv)
 	   the correct program. */
 	glUseProgram(program);
 	kuhl_errorcheck();
-
-	wall = generateBlock(program, 0,-2,5);
-	/* Good practice: Unbind objects until we really need them. */
+	glUseProgram(0);
+	glUseProgram(road_prog);
+	kuhl_errorcheck();
 	glUseProgram(0);
 
+	for(int i = 0; i < 3; i++){
+		//fix this
+		Block** temp = generateRow(0, -2, (i-1) * building_width*3);
+		for(int j = 0; j < 3; j++){
+			map[i*3 + j] = temp[j];
+		}
+		free(temp);
+		row++;
+	}
+	row = 0; col = 0;
+
+	/* Good practice: Unbind objects until we really need them. */
+	glUseProgram(0);
+	printf("Init Complete\n");
 	dgr_init();     /* Initialize DGR based on environment variables. */
 
 	you.yangle = 0;
@@ -921,6 +1124,7 @@ int main(int argc, char** argv)
 		/* process events (keyboard, mouse, etc) */
 		glfwPollEvents();
 	}
-	destroyBlock(wall);
+	for(int i = 0; i < max_blocks; i++)
+		destroyBlock(map[i]);
 	exit(EXIT_SUCCESS);
 }

@@ -3,8 +3,8 @@
 out vec4 fragColor;
 in vec3 lightDir;
 in vec3 out_Normal;
+in float out_Color;
 uniform float color;
-
 /** Calculate diffuse shading. Normal and light direction do not need
  * to be normalized. */
 float diffuseScalar(vec3 normal, vec3 lightDir, bool frontBackSame)
@@ -43,6 +43,7 @@ void main()
 	}else if(color == 2.0){
 		fragColor = vec4(0.2,0.8,0.2,1) * diffuse;
 	}else{
-		fragColor = vec4(0.8,0.2,0.2,1) * diffuse;
+	//else red
+		fragColor = vec4(0.8,0.1,0.1,1) * diffuse;
 	}
 }
