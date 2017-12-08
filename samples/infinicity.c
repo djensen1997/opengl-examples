@@ -999,7 +999,7 @@ Building* generateSmallBuilding(GLuint prog, float x, float y, float z){
 
 Block* generateBlock(float x, float y, float z){
 	int type = 0;//will detirmine the contents of the block (range 0-15)
-
+	srand(x + y);
 	type = type % 16;
 	Block* output = malloc(sizeof(Block));
 	output->buildings = (Building**)malloc(sizeof(Building*)*4);
