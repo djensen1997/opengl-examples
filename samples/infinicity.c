@@ -20,6 +20,7 @@
 
 static GLuint program = 0;
 static GLuint road_prog = 0; /**< id value for the GLSL program */
+static GLuint duck_prog = 0;
 
 
 
@@ -50,8 +51,10 @@ typedef struct block{
 typedef struct viewer{
 	float start_pos[3];
 	float start_look[3];
+	float start_char[3];
 	float curr_pos[3];
 	float curr_look[3];
+	float curr_char[3];
 	float translate[3];
 	float yangle;
 	float xangle;
@@ -88,6 +91,7 @@ static float curr_frame;
 static int row = -1;
 static int col = 0;
 static int debug = 0;
+static kuhl_geometry* duck;
 
 /* Called by GLFW whenever a key is pressed. */
 void keyboard(GLFWwindow* window, int key, int scancode, int action, int mods)
@@ -249,6 +253,28 @@ void display()
 		kuhl_errorcheck();
 		/* Draw the geometry using the matrices that we sent to the
 		 * vertex programs immediately above */
+		//draw da ducky
+		glUseProgram(duck_prog);
+		float duck_modelview[16], temp[16];
+		mat4f_rotateAxis_new(duck_modelview, you.xangle - 90, 0, 1, 0);
+		
+		mat4f_scale_new(temp, .5, .5, .5);
+		mat4f_mult_mat4f_new(duck_modelview, temp, duck_modelview);
+		mat4f_translate_new(temp, you.translate[0], you.translate[1] - 1, you.translate[2]);
+		mat4f_mult_mat4f_new(duck_modelview, temp, duck_modelview);
+		mat4f_mult_mat4f_new(duck_modelview, viewMat, duck_modelview);
+		glUniformMatrix4fv(kuhl_get_uniform("Projection"),
+			1,
+			0,
+			perspective);
+		kuhl_errorcheck();
+		glUniformMatrix4fv(kuhl_get_uniform("ModelView"),
+			1,
+			0,
+			duck_modelview);
+		kuhl_errorcheck();
+		kuhl_geometry_draw(duck);
+
 		if(debug == 1){
 			//printf("row = %d\n", row);
 		}
@@ -304,10 +330,17 @@ void updateViewer(){
 	temp[3] = 1;
 	mat4f_mult_vec4f_new(temp, look_model, temp);
 
+	float temp2[4];
+	temp2[0] = you.start_pos[0];
+	temp2[1] = you.start_pos[1];
+	temp2[2] = you.start_pos[2];
+	temp2[3] = 1;
+	mat4f_mult_vec4f_new(temp2, look_model, temp2);
+
 	float look_vec[3], scalar;
 	//look_point - camera_pos = look_vec
 	for(int i = 0; i < 3; i++){
-		look_vec[i] = temp[i] - you.start_pos[i];
+		look_vec[i] = temp[i] - temp2[i];
 	}
 	//for an x-z tranlastion, we don't need the y compnent of the look vector
 	look_vec[1] = 0;
@@ -339,15 +372,24 @@ void updateViewer(){
 
 	/****move the camera*****/
 
+	
+	mat4f_mult_mat4f_new(temp2, translation, temp2);
+	//copy the transformed point back to the viewer
+	for(int i = 0; i < 3; i++){
+		you.curr_pos[i] = temp2[i];
+	}
+
+	/***** move the duck ******/
 	//copy the start pos to temp
 	for(int i = 0; i < 3; i++){
-		temp[i] = you.start_pos[i];
+		temp[i] = you.start_char[i];
 	}
 	mat4f_mult_mat4f_new(temp, translation, temp);
 	//copy the transformed point back to the viewer
 	for(int i = 0; i < 3; i++){
-		you.curr_pos[i] = temp[i];
+		you.curr_char[i] = temp[i];
 	}
+
 
 	//map[max_blocks/2] should always be the middle of the map
 	//returns 0 if the viewer has moved out of the center of the map
@@ -1683,12 +1725,16 @@ int main(int argc, char** argv)
 	 * a fragment shader. */
 	program = kuhl_create_program("infinicity.vert", "infinicity.frag");
 	road_prog = kuhl_create_program("infinicity-road.vert", "infinicity-road.frag");
+	duck_prog = kuhl_create_program("infinicity_model.vert", "infinicity_model.frag");
 	/* Use the GLSL program so subsequent calls to glUniform*() send the variable to
 	   the correct program. */
 	glUseProgram(program);
 	kuhl_errorcheck();
 	glUseProgram(0);
 	glUseProgram(road_prog);
+	kuhl_errorcheck();
+	glUseProgram(0);
+	glUseProgram(duck_prog);
 	kuhl_errorcheck();
 	glUseProgram(0);
 
@@ -1705,6 +1751,9 @@ int main(int argc, char** argv)
 
 	/* Good practice: Unbind objects until we really need them. */
 	glUseProgram(0);
+	glUseProgram(duck_prog);
+	duck = kuhl_load_model("../models/duck/duck.dae", NULL, duck_prog, NULL);
+	glUseProgram(0);
 	printf("Init Complete\n");
 	dgr_init();     /* Initialize DGR based on environment variables. */
 
@@ -1712,16 +1761,19 @@ int main(int argc, char** argv)
 	you.xangle = 0;
 	you.start_pos[0] = 0;
 	you.start_pos[1] = 0;
-	you.start_pos[2] = 0;
+	you.start_pos[2] = -1.5;
 	you.start_look[0] = 0;
 	you.start_look[1] = 0;
 	you.start_look[2] = 10;
+	you.start_char[0] = 0;
+	you.start_char[1] = 0;
+	you.start_char[2] = 0;
 	
 	for(int i = 0; i<4; i++)
 		dirs[i] = 0;
 	
 	float initCamPos[3]  = {0,0,10}; // location of camera
-	float initCamLook[3] = {0,0,0}; // a point the camera is facing at
+	float initCamLook[3] = {0,0,-1}; // a point the camera is facing at
 	float initCamUp[3]   = {0,1,0}; // a vector indicating which direction is up
 	last_frame = glfwGetTime();
 	viewmat_init(initCamPos, initCamLook, initCamUp);
