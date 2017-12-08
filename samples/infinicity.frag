@@ -34,16 +34,21 @@ void main()
 {
 	float diffuse = diffuseScalar(out_Normal,lightDir,false);
 	//0 is for grey
-	if(color == 0.0){
-		fragColor = vec4(0.6,0.6,0.6,1) * diffuse;
-	//1 is for black
-	}else if(color == 1.0){
-		fragColor = vec4(0.1,0.1,0.1,1) * diffuse;
-	//2 is for green
-	}else if(color == 2.0){
-		fragColor = vec4(0.2,0.8,0.2,1) * diffuse;
+	float color = out_Color;
+	if(true){
+		if(color == 0.0){
+			fragColor = vec4(0.6,0.6,0.6,1) * diffuse;
+		//1 is for black
+		}else if(color == 1.0){
+			fragColor = vec4(0.1,0.1,0.1,1) * diffuse;
+		//2 is for green
+		}else if(color == 2.0){
+			fragColor = vec4(0.8,0.8,0.2,1) * diffuse;
+		}else{
+		//else red
+			fragColor = vec4(0.8,0.1,0.1,1) * diffuse;
+		}
 	}else{
-	//else red
-		fragColor = vec4(0.8,0.1,0.1,1) * diffuse;
+		fragColor = vec4(0.8,0.3,0.3,1);
 	}
 }

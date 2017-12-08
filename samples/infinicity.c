@@ -10,15 +10,20 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <math.h>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <time.h>
 
 #include "libkuhl.h"
 
 static GLuint program = 0;
 static GLuint road_prog = 0; /**< id value for the GLSL program */
 
+
+
+//stucts I will need for the program
 /*
  *
  * A collection of quads that form a building
@@ -41,17 +46,6 @@ typedef struct block{
 	kuhl_geometry road;
 	float road_color;
 }Block;
-Building* generateSmallBuilding(GLuint prog, float x, float y, float z);
-Block* generateBlock(float x, float y, float z);
-void drawBuilding(Building* build);
-void drawBlock(Block* object, float* viewMat, float* perspective);
-void destroyBlock(Block* object);
-void updateViewer();
-int viewer_in(Block* test);
-void expandRow(int dir);
-void expandColumn(int dir);
-Block** generateRow(float x, float y, float z);
-Block** generateColumn(float x, float y, float z);
 
 typedef struct viewer{
 	float start_pos[3];
@@ -63,6 +57,25 @@ typedef struct viewer{
 	float xangle;
 }Viewer;
 
+
+//function prototypes
+Building* generateSmallBuilding(GLuint prog, float x, float y, float z);
+Block* generateBlock(float x, float y, float z);
+void drawBuilding(Building* build);
+void drawBlock(Block* object, float* viewMat, float* perspective);
+void destroyBlock(Block* object);
+void updateViewer();
+int viewer_in(Block* test);
+void expandRow(int dir);
+void expandColumn(int dir);
+Block** generateRow(float x, float y, float z);
+Block** generateColumn(float x, float y, float z);
+float randColor();
+
+
+
+
+//global variables
 //static float min_height = 1.0;
 //static float max_height = 10.0;
 static float building_width = 5.0;
@@ -237,15 +250,15 @@ void display()
 		/* Draw the geometry using the matrices that we sent to the
 		 * vertex programs immediately above */
 		if(debug == 1){
-			printf("row = %d\n", row);
+			//printf("row = %d\n", row);
 		}
 		for(int i = 0; i < max_blocks; i++){
 			if(debug == 1){
-				printf("drawing block %d\n", i);
+				//printf("drawing block %d\n", i);
 			}
 			drawBlock(map[i], viewMat, perspective);
 			if(debug == 1){
-				printf("done drawing block %d\n",i); 
+				//printf("done drawing block %d\n",i); 
 			}
 		}
 		if(debug == 1){
@@ -342,23 +355,23 @@ void updateViewer(){
 	
 	if(expand == 1){
 		//expand with a new row in the negative z
-		printf("expanding map\n");
+		//printf("expanding map\n");
 		expandRow(-1);
-		printf("map expanded\n");
+		//printf("map expanded\n");
 	}else if(expand == 2){
 		//expand with a new row in the positive z
-		printf("expanding map\n");
+		//printf("expanding map\n");
 		expandRow(1);
-		printf("map expanded\n");
+		//printf("map expanded\n");
 	}else if(expand == 3){
 		//expand with a new column in the negative x
 		//printf("expanding map\n");
-		//expandColumn(-1);
+		expandColumn(-1);
 		//printf("map expanded\n");
 	}else if(expand == 4){
 		//expand with a new column in the positive x
 		//printf("expanding map\n");
-		//expandColumn(1);
+		expandColumn(1);
 		//printf("map expanded\n");
 	}else{
 		//don't expand
@@ -371,26 +384,37 @@ void updateViewer(){
 int viewer_in(Block* test){
 	float* model = test->modelMat;
 	//extract the x,y,z coordinates of the test block
-	float x = model[3];
-	float z = model[11];
+	float x = model[12];
+	float z = model[14];
+
+	
 	if(you.translate[0] < x - building_width*1.5){
 		col--;
+		//printf("(%f, %f, %f)\n", model[3], model[7], model[11]);
+		//printf("%f\n", you.translate[2]);
 		return 3;
 	}else if(you.translate[0] > x + building_width*1.5){
 		//not within the xcoords of the middle block
 		//add a column
 		col++;
+		//printf("(%f, %f, %f)\n", model[3], model[7], model[11]);
+		//printf("%f\n", you.translate[2]);
 		return 4;
 	}else if(you.translate[2] < z - building_width*1.5){
 		row --;
+		//printf("(%f, %f, %f)\n", model[3], model[7], model[11]);
+		//printf("%f\n", you.translate[2]);
 		return 1;
 	}else if(you.translate[2] > z + building_width*1.5){
 		//not within the zcoords of the middle block
 		//add a row
 		row ++;
+		//printf("(%f, %f, %f)\n", model[3], model[7], model[11]);
+		//printf("%f\n", you.translate[2]);
 		return 2;
+	}else{
+		return 0;
 	}
-	return 0;
 }
 
 void expandRow(int dir){
@@ -399,75 +423,132 @@ void expandRow(int dir){
 		return;
 	}
 	float offset[3] = {0,0,0};
-	offset[0] = col * building_width * 3;//x offset
+	//get the coords from the current middle
+	float *coords = map[max_blocks/2]->modelMat;//get the middle block
+
+	offset[0] = coords[12];//x offset
 	offset[1] = -2;
-	offset[2] = (row+dir) * building_width * 3;
+	offset[2] = coords[14] + dir * 6 * building_width;
+	
 	Block** new_row = generateRow(offset[0], offset[1], offset[2]);
-	printf("new row generated\n");
-	row += dir;
+	//printf("new row generated\n");
+	
 	switch(dir){
 		case 1:
-			printf("putting the row on the positive direction\n");
+			//printf("putting the row on the positive direction\n");
 			//since we are moving in the positive direction, 
 			//shift the last 6 blocks up by 3
 			for(int i = 0; i < 6; i++){
+				if(i < 3){
+					destroyBlock(map[i]);
+				}
 				map[i] = map[i+3];
 			}
-			printf("saved blocks shifted\n");
+			//printf("saved blocks shifted\n");
 			//put the new blocks on the map
 			for(int i = 6; i < 9; i++){
-				//destroyBlock(map[i]);
 				map[i] = new_row[i-6];
 			}
-			printf("new pieces added, old pieces freed\n");
+			//printf("new pieces added, old pieces freed\n");
 			break;
 		case -1:
-			printf("putting the row on the negative direction\n");
+			//printf("putting the row on the negative direction\n");
 			//since we are moving in the negative direction, 
 			//shift the first 6 blocks up by 3
 			for(int i = 8; i > 2; i--){
+				if(i >= 6){
+					destroyBlock(map[i]);
+				}
 				map[i] = map[i-3];
 			}
-			printf("saved blocks shifted\n");
+			//printf("saved blocks shifted\n");
 			//put the new blocks on the map
 			for(int i = 0; i < 3; i++){
-				//destroyBlock(map[i]);
 				map[i] = new_row[i];
 			}
-			printf("new pieces added, old ones freed\n");
+			//printf("new pieces added, old ones freed\n");
 			break;
 		default:
-			printf("ERROR: WHY WASN'T THIS CAUGHT EARLIER\n");
+			//printf("ERROR: WHY WASN'T THIS CAUGHT EARLIER\n");
 			break;
 	}
-	printf("freeing temp datastruct\n");
+	//printf("freeing temp datastruct\n");
+	free(new_row);
+	//debug = 1;
+}
+
+void expandColumn(int dir){
+	if(dir != -1 && dir != 1){
+		printf("ERROR: INCORRECT ROW DIRRECTION\n");
+		return;
+	}
+	float offset[3] = {0,0,0};
+	//get the coords from the current middle
+	float *coords = map[max_blocks/2]->modelMat;//get the middle block
+
+	offset[0] = coords[12] + dir * 6 * building_width;//x offset
+	offset[1] = -2;//y offset
+	offset[2] = coords[14];//z offset
+	
+	Block** new_row = generateColumn(offset[0], offset[1], offset[2]);
+	//printf("new row generated\n");
+	
+	switch(dir){
+		case 1:
+			//printf("putting the row on the positive direction\n");
+			//since we are moving in the positive direction, 
+			//shift the last 6 blocks up by 3
+			for(int i = 0; i < 9; i++){
+				if(i%3 == 0){
+					destroyBlock(map[i]);
+				}
+				if(i %3 != 2){
+					map[i] = map[i+1];
+				}
+			}
+			//printf("saved blocks shifted\n");
+			//put the new blocks on the map
+			for(int i = 0; i < 9; i+=3){
+				map[i+2] = new_row[i/3];
+			}
+			//printf("new pieces added, old pieces freed\n");
+			break;
+		case -1:
+			//printf("putting the row on the negative direction\n");
+			//since we are moving in the negative direction, 
+			//shift the first 6 blocks up by 3
+			for(int i = 8; i >= 0; i--){
+				if(i %3==2){
+					destroyBlock(map[i]);
+				}
+				if( i %3 != 0){
+					map[i] = map[i-1];
+				}
+			}
+			//printf("saved blocks shifted\n");
+			//put the new blocks on the map
+			for(int i = 0; i < 9; i+=3){
+				map[i] = new_row[i/3];
+			}
+			//printf("new pieces added, old ones freed\n");
+			break;
+		default:
+			//printf("ERROR: WHY WASN'T THIS CAUGHT EARLIER\n");
+			break;
+	}
+	//printf("freeing temp datastruct\n");
 	free(new_row);
 	//debug = 1;
 }
 
 void drawBuilding(Building* build){
 	int i = 0;
-	int iter = 1 + (int)build->width * (int)build->height * 4;
+	int iter = 2;
 	if(debug == 1){
-		printf("drawing the quads\n");
+		//printf("drawing the quads\n");
 	}
 	
 	for(i = 0; i < iter; i++){
-		float color;
-		if(i == 0){
-			color = 0.0;
-		}else{
-			//sets color ether green or black
-			color = (float)(i % 3);
-			if(color != 2.0){
-				color = 1.0;
-			}
-		}
-		
-		glUniform1f(
-			kuhl_get_uniform("color"),	//tells it what attribute to set
-			color						//tells it what to set the attribute
-		);
 		kuhl_geometry_draw(&(build->quads[i]));
 	}
 }
@@ -483,7 +564,7 @@ void drawBlock(Block* object, float* viewMat, float* perspective){
 	for(int i = 0; i < 4; i++){
 		float modelview[16];
 		if(debug == 1){
-			printf("drawing building %d\n", i);
+			//printf("drawing building %d\n", i);
 		}
 		mat4f_mult_mat4f_new(modelview,viewMat,object->buildings[i]->modelMat);
 		// Send the modelview matrix to the vertex program.
@@ -492,7 +573,7 @@ void drawBlock(Block* object, float* viewMat, float* perspective){
 		    0, 			// transpose
 			modelview); // value
 		if(debug == 1){
-			printf("modelview sent\n");
+			//printf("modelview sent\n");
 		}
 		drawBuilding(object->buildings[i]);
 	}
@@ -531,7 +612,7 @@ Building* generateSmallBuilding(GLuint prog, float x, float y, float z){
 	//the 1 is the base building, the width and height detirmine the number
 	//of windows on the building and there are 4 sides of the building that
 	//need windows
-	output->quads = (kuhl_geometry*)malloc(sizeof(kuhl_geometry) * (int)(1 + building_width * output->height * 4));
+	output->quads = (kuhl_geometry*)malloc(sizeof(kuhl_geometry) * 2);
 	//create quads centered on the origin
 
 	//create the base cube
@@ -657,10 +738,13 @@ Building* generateSmallBuilding(GLuint prog, float x, float y, float z){
 			};
 		kuhl_geometry_indices(geom, indexData, 36);
 		/* Set the uniform variable in the shader that is named "red" to the value 1. */
-		float color = 0.0;
+		float color[24];
+		for(int i=0; i < 24; i++){
+			color[i] = 0.0;
+		}
 		kuhl_geometry_attrib(
 			geom,
-			&color,						//tells it what to set the attribute
+			color,						//tells it what to set the attribute
 			1,
 			"color",					//tells it what attribute to set
 			KG_WARN
@@ -668,248 +752,240 @@ Building* generateSmallBuilding(GLuint prog, float x, float y, float z){
 
 		kuhl_errorcheck();
 	}
-	
-	//puts windows on the back of the building
-	//set the windows
-	int num_windows = output->width * output->height;
-	for(int i = 0; i < num_windows; i++){
-		//modified code from the racecar assignment
-		kuhl_geometry_new(&(output->quads[i+1]),prog,4,GL_TRIANGLES);
+
+	{
+		//window code
+		//puts windows on the back of the building
+		//set the windows
+		int num_windows = output->width * output->height;//num windows per side
+		int num_verts = num_windows * 4 * 4;//number of windows * num_sides * num_verts/window
 		float height = output->height;
-		int j = i % num_windows;
-
-		//sets the verticies for a rectangular prism with a square base and
-		//a variable height
-		//centered on the origin
-		GLfloat vertexPositions[] = {
-			//front
-			-building_width/2 + 1.0 * (i%((int)building_width)) + .03,//x
-			-height/2 + j/((int)building_width) + .03,//y
-			-building_width/2 - .01,//z,A
-
-			-building_width/2 + 1.0 * (i%((int)building_width)) + .03,
-			-height/2 + j/((int)building_width) + .97,
-			-building_width/2 - .01,//B
-
-			-building_width/2 + 1.0 * (i%((int)building_width)) + .97,
-			-height/2 + j/((int)building_width) + .03,
-			-building_width/2 - .01,//C
-
-			-building_width/2 + 1.0 * (i%((int)building_width)) + .97,
-			-height/2 + j/((int)building_width) + .97,
-			-building_width/2 - .01//D
-		};
-
-		//sets the normals for the cube
-		kuhl_geometry_attrib(&(output->quads[i+1]),vertexPositions,3,"in_Position",KG_WARN);
-		GLfloat normalData[] = {
-			//front
-			0, 0, -1,
-			0, 0, -1,
-			0, 0, -1,
-			0, 0, -1,
-		};
-
-		kuhl_geometry_attrib(&(output->quads[i+1]), normalData,3,"in_Normal",KG_WARN);
-		GLuint indexData[] = { 
-			//front
-			0, 1, 3,  
-			0, 2, 3,
-			};
-		kuhl_geometry_indices(&(output->quads[i+1]), indexData, 6);
-		kuhl_errorcheck();
-	}
-	//puts windows on the front of the building
-	//set the windows
-	for(int i = num_windows; i < num_windows*2; i++){
-		//modified code from the racecar assignment
-		kuhl_geometry_new(&(output->quads[i+1]),prog,4,GL_TRIANGLES);
-		float height = output->height;
-		int j = i % num_windows;
-		//sets the verticies for a rectangular prism with a square base and
-		//a variable height
-		//centered on the origin
-		GLfloat vertexPositions[] = {
-			//front
-			-building_width/2 + 1.0 * (i%((int)building_width)) + .03,//x
-			-height/2 + j/((int)building_width) + .03,//y
-			building_width/2 + .01,//z,A
-
-			-building_width/2 + 1.0 * (i%((int)building_width)) + .03,
-			-height/2 + j/((int)building_width) + .97,
-			building_width/2 + .01,//B
-
-			-building_width/2 + 1.0 * (i%((int)building_width)) + .97,
-			-height/2 + j/((int)building_width) + .03,
-			building_width/2 + .01,//C
-
-			-building_width/2 + 1.0 * (i%((int)building_width)) + .97,
-			-height/2 + j/((int)building_width) + .97,
-			building_width/2 + .01//D
-		};
-		
-		//sets the normals for the cube
-		kuhl_geometry_attrib(&(output->quads[i+1]),vertexPositions,3,"in_Position",KG_WARN);
-		GLfloat normalData[] = {
-			//front
-			0, 0, 1,
-			0, 0, 1,
-			0, 0, 1,
-			0, 0, 1,
-		};
-		
-		kuhl_geometry_attrib(&(output->quads[i+1]), normalData,3,"in_Normal",KG_WARN);
-		GLuint indexData[] = { 
-			//front
-			0, 1, 3,  
-			0, 2, 3,
-			};
-		kuhl_geometry_indices(&(output->quads[i+1]), indexData, 6);
-		
-		//sets color ether green or black
-		float color = (float)(i % 3);
-		if(color != 2.0){
-			color = 1.0;
+		kuhl_geometry_new(&(output->quads[1]), prog, num_verts, GL_TRIANGLES);
+		GLfloat* vertexPositions = (GLfloat*)malloc(sizeof(GLfloat) * num_verts * 3);
+		for(int i = 0; i < num_verts*3; i++){
+			vertexPositions[i] = 0;
 		}
-		kuhl_geometry_attrib(
-			&(output->quads[i+1]),
-			&color,						//tells it what to set the attribute
-			1,
-			"color",					//tells it what attribute to set
-			KG_WARN
-		);
-		
-
-		kuhl_errorcheck();
-	}
-	//left side of the building
-	//set the windows
-	for(int i = num_windows*2; i < num_windows*3; i++){
-		//modified code from the racecar assignment
-		kuhl_geometry_new(&(output->quads[i+1]),prog,4,GL_TRIANGLES);
-		float height = output->height;
-		int j = i % num_windows;
-
-		//sets the verticies for a rectangular prism with a square base and
-		//a variable height
-		//centered on the origin
-		GLfloat vertexPositions[] = {
-			//front
-			-building_width/2 - .01,//x
-			-height/2 + j/((int)building_width) + .03,//y
-			-building_width/2 + 1.0 * (i%((int)building_width)) + .03,//z,A
-
-			-building_width/2 - .01,//x
-			-height/2 + j/((int)building_width) + .97,//y
-			-building_width/2 + 1.0 * (i%((int)building_width)) + .03,//z,B
-
-			-building_width/2 - .01,//x
-			-height/2 + j/((int)building_width) + .03,//y
-			-building_width/2 + 1.0 * (i%((int)building_width)) + .97,//z,C
-
-			-building_width/2 - .01,//x
-			-height/2 + j/((int)building_width) + .97,//y
-			-building_width/2 + 1.0 * (i%((int)building_width)) + .97//z,D
-		};
-
-		//sets the normals for the cube
-		kuhl_geometry_attrib(&(output->quads[i+1]),vertexPositions,3,"in_Position",KG_WARN);
-		GLfloat normalData[] = {
-			//front
-			-1, 0, 0,
-			-1, 0, 0,
-			-1, 0, 0,
-			-1, 0, 0,
-		};
-
-		kuhl_geometry_attrib(&(output->quads[i+1]), normalData,3,"in_Normal",KG_WARN);
-		GLuint indexData[] = { 
-			//front
-			0, 1, 3,  
-			0, 2, 3,
-			};
-		kuhl_geometry_indices(&(output->quads[i+1]), indexData, 6);
-		
-		//sets color ether green or black
-		
-		float color = (float)(i % 3);
-		if(color != 2.0){
-			color = 1.0;
+		GLfloat* normals = (GLfloat*)malloc(sizeof(GLfloat) * num_verts * 3);
+		for(int i = 0; i < num_verts*3; i++){
+			normals[i] = 0;
 		}
-		kuhl_geometry_attrib(
-			&(output->quads[i+1]),
-			&color,						//tells it what to set the attribute
-			1,
-			"color",					//tells it what attribute to set
-			KG_WARN
-		);
-		
-
-		kuhl_errorcheck();
-	}
-
-	//set the windows
-	for(int i = num_windows*3; i < num_windows*4; i++){
-		//modified code from the racecar assignment
-		kuhl_geometry_new(&(output->quads[i+1]),prog,4,GL_TRIANGLES);
-
-		float height = output->height;
-		int j = i % num_windows;
-		//sets the verticies for a rectangular prism with a square base and
-		//a variable height
-		//centered on the origin
-		GLfloat vertexPositions[] = {
-			//front
-			building_width/2 + .01,//x
-			-height/2 + j/((int)building_width) + .03,//y
-			-building_width/2 + 1.0 * (i%((int)building_width)) + .03,//z,A
-
-			building_width/2 + .01,//x
-			-height/2 + j/((int)building_width) + .97,//y
-			-building_width/2 + 1.0 * (i%((int)building_width)) + .03,//z,B
-
-			building_width/2 + .01,//x
-			-height/2 + j/((int)building_width) + .03,//y
-			-building_width/2 + 1.0 * (i%((int)building_width)) + .97,//z,C
-
-			building_width/2 + .01,//x
-			-height/2 + j/((int)building_width) + .97,//y
-			-building_width/2 + 1.0 * (i%((int)building_width)) + .97//z,D
-		};
-
-		//sets the normals for the cube
-		kuhl_geometry_attrib(&(output->quads[i+1]),vertexPositions,3,"in_Position",KG_WARN);
-		GLfloat normalData[] = {
-			//front
-			1, 0, 0,
-			1, 0, 0,
-			1, 0, 0,
-			1, 0, 0,
-		};
-
-		kuhl_geometry_attrib(&(output->quads[i+1]), normalData,3,"in_Normal",KG_WARN);
-		GLuint indexData[] = { 
-			//front
-			0, 1, 3,  
-			0, 2, 3,
-			};
-		kuhl_geometry_indices(&(output->quads[i+1]), indexData, 6);
-		
-		//sets color ether green or black
-		float color = (float)(i % 3);
-		if(color != 2.0){
-			color = 1.0;
+		GLuint* indexdata = (GLuint*)malloc(sizeof(GLuint) * num_windows * 4 * 2 * 3);
+		for(int i = 0; i < num_windows * 4 * 2 * 3; i++){
+			indexdata[i] = 0;
 		}
-		kuhl_geometry_attrib(
-			&(output->quads[i+1]),
-			&color,						//tells it what to set the attribute
-			1,
-			"color",					//tells it what attribute to set
-			KG_WARN
-		);
-		
+		GLfloat* wind_colors = (GLfloat*)malloc(sizeof(GLfloat) * num_windows * 4 * 4);
+		for(int i = 0; i < num_windows * 4 * 4; i++){
+			wind_colors[i] = 0;
+		}
 
-		kuhl_errorcheck();
+		for(int i = 0; i < num_windows; i++){
+			//front 
+			int j = i % num_windows;
+			//x offset relative to the center of the building
+			float xoff = -building_width/2 + 1.0 * (i%((int)building_width));
+			float yoff = -height/2 + j/((int)building_width);
+			float zoff = -building_width/2;
+			//vertex 1
+			vertexPositions[i*12 + 0] = xoff + .03;//x
+			vertexPositions[i*12 + 1] = yoff + .03;//y
+			vertexPositions[i*12 + 2] = zoff - .01;//z,A
+
+			//vertex 2
+			vertexPositions[i*12 + 3] = xoff + .03;//x
+			vertexPositions[i*12 + 4] = yoff + .97;//y
+			vertexPositions[i*12 + 5] = zoff - .01;//B
+
+			//vertex 3
+			vertexPositions[i*12 + 6] = xoff + .97;//x
+			vertexPositions[i*12 + 7] = yoff + .03;//y
+			vertexPositions[i*12 + 8] = zoff - .01;//z,C
+
+			//vertex 4
+			vertexPositions[i*12 + 9] = xoff + .97;//x
+			vertexPositions[i*12 + 10] = yoff + .97;//y
+			vertexPositions[i*12 + 11] = zoff - .01;//z,A
+
+			normals[i*12 + 0] = 0;
+			normals[i*12 + 1] = 0;
+			normals[i*12 + 2] = -1;
+			normals[i*12 + 3] = 0;
+			normals[i*12 + 4] = 0;
+			normals[i*12 + 5] = -1;
+			normals[i*12 + 6] = 0;
+			normals[i*12 + 7] = 0;
+			normals[i*12 + 8] = -1;
+			normals[i*12 + 9] = 0;
+			normals[i*12 + 10] = 0;
+			normals[i*12 + 11] = -1;
+
+			indexdata[i*6 + 0] = 0 + i*4;
+			indexdata[i*6+ 1] = 1 + i*4;
+			indexdata[i*6+ 2] = 2 + i*4;
+			indexdata[i*6+ 3] = 1 + i*4;
+			indexdata[i*6+ 4] = 2 + i*4;
+			indexdata[i*6+ 5] = 3 + i*4;
+
+			float color = randColor();
+			wind_colors[i*4] = color;
+			wind_colors[i*4+1] = color;
+			wind_colors[i*4+2] = color;
+			wind_colors[i*4+3] = color;
+		} 
+		
+		for(int i = num_windows; i < num_windows*2; i++){
+			//back
+			int j = i % num_windows;
+			//vertex 1
+			vertexPositions[i*12 + 0] = -building_width/2 + 1.0 * (i%((int)building_width)) + .03;//x
+			vertexPositions[i*12 + 1] = -height/2 + j/((int)building_width) + .03;//y
+			vertexPositions[i*12 + 2] = building_width/2 + .01;//z,A
+
+			//vertex 2
+			vertexPositions[i*12 + 3] = -building_width/2 + 1.0 * (i%((int)building_width)) + .03;//x
+			vertexPositions[i*12 + 4] = -height/2 + j/((int)building_width) + .97;//y
+			vertexPositions[i*12 + 5] = building_width/2 + .01;//B
+
+			//vertex 3
+			vertexPositions[i*12 + 6] = -building_width/2 + 1.0 * (i%((int)building_width)) + .97;//x
+			vertexPositions[i*12 + 7] = -height/2 + j/((int)building_width) + .03;//y
+			vertexPositions[i*12 + 8] = building_width/2 + .01;//z,C
+
+			//vertex 4
+			vertexPositions[i*12 + 9] = -building_width/2 + 1.0 * (i%((int)building_width)) + .97;//x
+			vertexPositions[i*12 + 10] = -height/2 + j/((int)building_width) + .97;//y
+			vertexPositions[i*12 + 11] = building_width/2 + .01;//z,A
+
+			normals[i*12+ 0] = 0;
+			normals[i*12+ 1] = 0;
+			normals[i*12+ 2] = 1;
+			normals[i*12+ 3] = 0;
+			normals[i*12+ 4] = 0;
+			normals[i*12+ 5] = 1;
+			normals[i*12+ 6] = 0;
+			normals[i*12+ 7] = 0;
+			normals[i*12+ 8] = 1;
+			normals[i*12+ 9] = 0;
+			normals[i*12+ 10] = 0;
+			normals[i*12+ 11] = 1;
+
+			indexdata[i*6 + 0] = 0 + i*4;
+			indexdata[i*6+ 1] = 1 + i*4;
+			indexdata[i*6+ 2] = 2 + i*4;
+			indexdata[i*6+ 3] = 1 + i*4;
+			indexdata[i*6+ 4] = 2 + i*4;
+			indexdata[i*6+ 5] = 3 + i*4;
+
+			float color = randColor();
+			wind_colors[i*4] = color;
+			wind_colors[i*4+1] = color;
+			wind_colors[i*4+2] = color;
+			wind_colors[i*4+3] = color;
+		} 
+
+		for(int i = num_windows*2; i < num_windows*3; i++){
+			//left
+			int j = i % num_windows;
+			//vertex 1
+			vertexPositions[i*12 + 0] = -building_width/2 - .01;//x
+			vertexPositions[i*12 + 1] = -height/2 + j/((int)building_width) + .03;//y
+			vertexPositions[i*12 + 2] = -building_width/2 + 1.0 * (i%((int)building_width)) + .03;//z,A
+
+			//vertex 2
+			vertexPositions[i*12 + 3] = -building_width/2 - .01;//x
+			vertexPositions[i*12 + 4] = -height/2 + j/((int)building_width) + .97;//y
+			vertexPositions[i*12 + 5] = -building_width/2 + 1.0 * (i%((int)building_width)) + .03;//B
+
+			//vertex 3
+			vertexPositions[i*12 + 6] = -building_width/2 - .01;//x;
+			vertexPositions[i*12 + 7] = -height/2 + j/((int)building_width) + .03;//y
+			vertexPositions[i*12 + 8] = -building_width/2 + 1.0 * (i%((int)building_width)) + .97;//z,C
+
+			//vertex 4
+			vertexPositions[i*12 + 9] = -building_width/2 - .01;//x
+			vertexPositions[i*12 + 10] = -height/2 + j/((int)building_width) + .97;//y
+			vertexPositions[i*12 + 11] = -building_width/2 + 1.0 * (i%((int)building_width)) + .97;//z,A
+			
+			normals[i*12+ 0] = -1;
+			normals[i*12+ 1] = 0;
+			normals[i*12+ 2] = 0;
+			normals[i*12+ 3] = -1;
+			normals[i*12+ 4] = 0;
+			normals[i*12+ 5] = 0;
+			normals[i*12+ 6] = -1;
+			normals[i*12+ 7] = 0;
+			normals[i*12+ 8] = 0;
+			normals[i*12+ 9] = -1;
+			normals[i*12+ 10] = 0;
+			normals[i*12+ 11] = 0;
+
+			indexdata[i*6 + 0] = 0 + i*4;
+			indexdata[i*6+ 1] = 1 + i*4;
+			indexdata[i*6+ 2] = 2 + i*4;
+			indexdata[i*6+ 3] = 1 + i*4;
+			indexdata[i*6+ 4] = 2 + i*4;
+			indexdata[i*6+ 5] = 3 + i*4;
+
+			float color = randColor();
+			wind_colors[i*4] = color;
+			wind_colors[i*4+1] = color;
+			wind_colors[i*4+2] = color;
+			wind_colors[i*4+3] = color;
+		} 
+
+		for(int i = num_windows*3; i < num_windows*4; i++){
+			//right
+			int j = i % num_windows;
+			//vertex 1
+			vertexPositions[i*12 + 0] = building_width/2 + .01;//x
+			vertexPositions[i*12 + 1] = -height/2 + j/((int)building_width) + .03;//y
+			vertexPositions[i*12 + 2] = -building_width/2 + 1.0 * (i%((int)building_width)) + .03;//z,A
+
+			//vertex 2
+			vertexPositions[i*12 + 3] = building_width/2 + .01;//x
+			vertexPositions[i*12 + 4] = -height/2 + j/((int)building_width) + .97;//y
+			vertexPositions[i*12 + 5] = -building_width/2 + 1.0 * (i%((int)building_width)) + .03;//B
+
+			//vertex 3
+			vertexPositions[i*12 + 6] = building_width/2 + .01;//x;
+			vertexPositions[i*12 + 7] = -height/2 + j/((int)building_width) + .03;//y
+			vertexPositions[i*12 + 8] = -building_width/2 + 1.0 * (i%((int)building_width)) + .97;//z,C
+
+			//vertex 4
+			vertexPositions[i*12 + 9] = building_width/2 + .01;//x
+			vertexPositions[i*12 + 10] = -height/2 + j/((int)building_width) + .97;//y
+			vertexPositions[i*12 + 11] = -building_width/2 + 1.0 * (i%((int)building_width)) + .97;//z,A
+			
+			normals[i*12+ 0] = 1;
+			normals[i*12+ 1] = 0;
+			normals[i*12+ 2] = 0;
+			normals[i*12+ 3] = 1;
+			normals[i*12+ 4] = 0;
+			normals[i*12+ 5] = 0;
+			normals[i*12+ 6] = 1;
+			normals[i*12+ 7] = 0;
+			normals[i*12+ 8] = 0;
+			normals[i*12+ 9] = 1;
+			normals[i*12+ 10] = 0;
+			normals[i*12+ 11] = 0;
+
+			indexdata[i*6 + 0] = 0 + i*4;
+			indexdata[i*6+ 1] = 1 + i*4;
+			indexdata[i*6+ 2] = 2 + i*4;
+			indexdata[i*6+ 3] = 1 + i*4;
+			indexdata[i*6+ 4] = 2 + i*4;
+			indexdata[i*6+ 5] = 3 + i*4;
+
+			float color = randColor();
+			wind_colors[i*4] = color;
+			wind_colors[i*4+1] = color;
+			wind_colors[i*4+2] = color;
+			wind_colors[i*4+3] = color;
+		} 
+		//YAY!!!!
+		kuhl_geometry_attrib(&(output->quads[1]),vertexPositions,3,"in_Position",KG_WARN);
+		kuhl_geometry_attrib(&(output->quads[1]),normals,3,"in_Normal",KG_WARN);
+		kuhl_geometry_indices(&(output->quads[1]), indexdata, num_windows * 4 * 3 * 2);
+		kuhl_geometry_attrib(&(output->quads[1]), wind_colors,1 ,"color", KG_WARN);
 	}
 
 	output->modelMat = (float*)malloc(sizeof(float) * 16);
@@ -1050,6 +1126,23 @@ Block** generateRow(float x, float y, float z){
 	return output;
 }
 
+Block** generateColumn(float x, float y, float z){
+	Block** output = (Block**)malloc(sizeof(Block*) * 3);
+	for(int i = -1; i < 2;i++){
+		Block* temp = generateBlock(x,y,z + 3 * building_width * i);
+		output[i+1] = temp;
+	}
+	return output;
+}
+
+float randColor(){
+	float color = (float)((rand()%4) + 1);
+	if(color != 2.0){
+		color = 1.0;
+	}
+	return color;
+}
+
 void destroyBlock(Block* object){
 	free(object->modelMat);
 	for(int i = 0 ; i < 4; i++){
@@ -1064,6 +1157,7 @@ int main(int argc, char** argv)
 {
 	/* Initialize GLFW and GLEW */
 	kuhl_ogl_init(&argc, argv, 512, 512, 32, 4);
+	srand(time(NULL));
 
 	/* Specify function to call when keys are pressed. */
 	glfwSetKeyCallback(kuhl_get_window(), keyboard);
