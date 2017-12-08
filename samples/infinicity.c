@@ -76,8 +76,8 @@ float randColor();
 
 
 //global variables
-static float min_height = 1.0;
-static float max_height = 15.0;
+static float min_height = 4.0;
+static float max_height = 20.0;
 static float building_width = 5.0;
 static Block* map[9];
 static int max_blocks = 9;//should be a square number (i.e 1,4,9,16,25...)
@@ -997,10 +997,518 @@ Building* generateSmallBuilding(GLuint prog, float x, float y, float z){
 	return output;
 }
 
+/*	
+ *	@param prog the program that puts the points on the screen
+ *	@param x	the world x coord
+ * 	@param y	the world y coord
+ * 	@param z 	the world z coord
+ * 	@return a build building (with one wall having windows)
+ */
+Building* generateComplexBuilding(GLuint prog, float x, float y, float z){
+	Building* output = (Building*)malloc(sizeof(Building));
+	output->width = building_width;
+	output->height = (float)(rand() % (int)max_height);
+	if(output->height < min_height){
+		output->height = min_height;
+	}
+	float bottom_height = output->height/2 + (int)(output->height)%2;
+	float top_height = output->height/2;
+	float top_width = (int)(building_width)/2 + 1;
+	
+	//the 1 is the base building, the width and height detirmine the number
+	//of windows on the building and there are 4 sides of the building that
+	//need windows
+	output->quads = (kuhl_geometry*)malloc(sizeof(kuhl_geometry) * 2);
+	//create quads centered on the origin
+
+	//create the base cube
+	{
+		kuhl_geometry* geom = &(output->quads[0]);
+		//modified code from the racecar assignment
+		kuhl_geometry_new(&(output->quads[0]),prog,48,GL_TRIANGLES);
+
+		float height = output->height;
+
+		//sets the verticies for a rectangular prism with a square base and
+		//a variable height
+		//centered on the origin
+		GLfloat vertexPositions[] = {
+
+			//front
+			-building_width/2,-output->height/2,				-building_width/2,//A
+			-building_width/2,-output->height/2 + bottom_height,-building_width/2,//B
+			building_width/2,-output->height/2,					-building_width/2,//C
+			building_width/2,-output->height/2 + bottom_height,	-building_width/2,//D
+			
+			//back
+			-building_width/2,-output->height/2,building_width/2,//E
+			-building_width/2,-output->height/2 + bottom_height,building_width/2,//F
+			building_width/2,-output->height/2,building_width/2,//G
+			building_width/2,-output->height/2 + bottom_height,building_width/2,//H
+			
+			//top
+			-building_width/2,-output->height/2 + bottom_height,-building_width/2,//B
+			-building_width/2,-output->height/2 + bottom_height,building_width/2,//F
+			building_width/2,-output->height/2 + bottom_height,-building_width/2,//D
+			building_width/2,-output->height/2 + bottom_height,building_width/2,//H
+			
+
+			//bottom
+			-building_width/2,-output->height/2,-building_width/2,//A
+			-building_width/2,-output->height/2,building_width/2,//E
+			building_width/2,-output->height/2,-building_width/2,//C
+			building_width/2,-output->height/2,building_width/2,//G
+
+			//left
+			-building_width/2,-output->height/2,-building_width/2,//A
+			-building_width/2,-output->height/2,building_width/2,//E
+			-building_width/2,-output->height/2 + bottom_height,-building_width/2,//B
+			-building_width/2,-output->height/2 + bottom_height,building_width/2,//F
+
+			//right
+			building_width/2,-output->height/2,-building_width/2,//C
+			building_width/2,-output->height/2,building_width/2,//G
+			building_width/2,-output->height/2 + bottom_height,-building_width/2,//D
+			building_width/2,-output->height/2 + bottom_height,building_width/2,//H
+			
+
+
+
+
+
+			//front
+			-top_width/2,output->height/2 - top_height,	-top_width/2,//A
+			-top_width/2,output->height/2,				-top_width/2,//B
+			top_width/2,output->height/2 - top_height,	-top_width/2,//C
+			top_width/2,output->height/2,				-top_width/2,//D
+			
+			//back
+			-top_width/2,output->height/2 - top_height,top_width/2,//E
+			-top_width/2,output->height/2,top_width/2,//F
+			top_width/2,output->height/2 - top_height,top_width/2,//G
+			top_width/2,output->height/2,top_width/2,//H
+			
+			//top
+			-top_width/2,output->height/2,-top_width/2,//B
+			-top_width/2,output->height/2,top_width/2,//F
+			top_width/2,output->height/2,-top_width/2,//D
+			top_width/2,output->height/2,top_width/2,//H
+			
+
+			//bottom
+			-top_width/2,output->height/2 - top_height,-top_width/2,//A
+			-top_width/2,output->height/2 - top_height,top_width/2,//E
+			top_width/2,output->height/2 - top_height,-top_width/2,//C
+			top_width/2,output->height/2 - top_height,top_width/2,//G
+
+			//left
+			-top_width/2,output->height/2 - top_height,-top_width/2,//A
+			-top_width/2,output->height/2 - top_height,top_width/2,//E
+			-top_width/2,output->height/2,-top_width/2,//B
+			-top_width/2,output->height/2,top_width/2,//F
+
+			//right
+			top_width/2,output->height/2 - top_height,-top_width/2,//C
+			top_width/2,output->height/2 - top_height,top_width/2,//G
+			top_width/2,output->height/2,-top_width/2,//D
+			top_width/2,output->height/2,top_width/2,//H
+			
+		};
+
+		//sets the normals for the cube
+		kuhl_geometry_attrib(geom,vertexPositions,3,"in_Position",KG_WARN);
+		GLfloat normalData[] = {
+			//front
+			0, 0, 1,
+			0, 0, 1,
+			0, 0, 1,
+			0, 0, 1,
+			
+			//back
+			0, 0, -1,
+			0, 0, -1,
+			0, 0, -1,
+			0, 0, -1,
+
+			//top
+			0, 1, 0,
+			0, 1, 0,
+			0, 1, 0,
+			0, 1, 0,
+			//bottom
+			0, -1, 0,
+			0, -1, 0,
+			0, -1, 0,
+			0, -1, 0,
+			//left
+			-1, 0, 0,
+			-1, 0, 0,
+			-1, 0, 0,
+			-1, 0, 0,
+			//right
+			1, 0, 0,
+			1, 0, 0,
+			1, 0, 0,
+			1, 0, 0,
+
+			//front
+			0, 0, 1,
+			0, 0, 1,
+			0, 0, 1,
+			0, 0, 1,
+			
+			//back
+			0, 0, -1,
+			0, 0, -1,
+			0, 0, -1,
+			0, 0, -1,
+
+			//top
+			0, 1, 0,
+			0, 1, 0,
+			0, 1, 0,
+			0, 1, 0,
+			//bottom
+			0, -1, 0,
+			0, -1, 0,
+			0, -1, 0,
+			0, -1, 0,
+			//left
+			-1, 0, 0,
+			-1, 0, 0,
+			-1, 0, 0,
+			-1, 0, 0,
+			//right
+			1, 0, 0,
+			1, 0, 0,
+			1, 0, 0,
+			1, 0, 0
+		};
+		kuhl_geometry_attrib(geom, normalData,3,"in_Normal",KG_WARN);
+		/* A list of triangles that we want to draw. "0" refers to the
+		* first vertex in our list of vertices. Every three numbers forms
+		* a single triangle. */
+		GLuint indexData[6 * 3 * 2 * 2];
+		for(int i = 0; i < 12; i++){
+			indexData[i*6 + 0] = 0 + i*4;
+			indexData[i*6 + 1] = 1 + i*4;
+			indexData[i*6 + 2] = 2 + i*4;
+			indexData[i*6 + 3] = 1 + i*4;
+			indexData[i*6 + 4] = 2 + i*4;
+			indexData[i*6 + 5] = 3 + i*4;
+		}
+		kuhl_geometry_indices(geom, indexData, 72);
+		/* Set the uniform variable in the shader that is named "red" to the value 1. */
+		float color[48];
+		for(int i=0; i < 48; i++){
+			color[i] = 0.0;
+		}
+		kuhl_geometry_attrib(
+			geom,
+			color,						//tells it what to set the attribute
+			1,
+			"color",					//tells it what attribute to set
+			KG_WARN
+		);
+
+		kuhl_errorcheck();
+	}
+
+
+
+
+
+
+	
+	{
+		//window code
+		//puts windows on the back of the building
+		//set the windows
+		int num_windows = output->width * bottom_height + top_width * top_height;//num windows per side
+		int num_verts = num_windows * 4 * 4;//number of windows * num_sides * num_verts/window
+		float height = output->height;
+		kuhl_geometry_new(&(output->quads[1]), prog, num_verts, GL_TRIANGLES);
+		GLfloat* vertexPositions = (GLfloat*)malloc(sizeof(GLfloat) * num_verts * 3);
+		for(int i = 0; i < num_verts*3; i++){
+			vertexPositions[i] = 0;
+		}
+		GLfloat* normals = (GLfloat*)malloc(sizeof(GLfloat) * num_verts * 3);
+		for(int i = 0; i < num_verts*3; i++){
+			normals[i] = 0;
+		}
+		GLuint* indexdata = (GLuint*)malloc(sizeof(GLuint) * num_windows * 4 * 2 * 3);
+		for(int i = 0; i < num_windows * 4 * 2 * 3; i++){
+			indexdata[i] = 0;
+		}
+		GLfloat* wind_colors = (GLfloat*)malloc(sizeof(GLfloat) * num_windows * 4 * 4);
+		for(int i = 0; i < num_windows * 4 * 4; i++){
+			wind_colors[i] = 0;
+		}
+
+		int start_top = output->width * bottom_height;
+
+		for(int i = 0; i < num_windows; i++){
+			//front 
+			int j = i % num_windows;
+			//x offset relative to the center of the building
+			float xoff,yoff,zoff;
+			if(i < start_top){
+				xoff = -building_width/2 + 1.0 * (i%((int)building_width));
+				yoff = -height/2 + j/((int)building_width);
+				zoff = -building_width/2;
+			}else{
+				xoff = -top_width/2 + 1.0 * (i%((int)top_width));
+				j = j - start_top;
+				yoff = -height/2 + bottom_height + j/((int)top_width);
+				zoff = -top_width/2;
+			}
+			//vertex 1
+			vertexPositions[i*12 + 0] = xoff + .03;//x
+			vertexPositions[i*12 + 1] = yoff + .03;//y
+			vertexPositions[i*12 + 2] = zoff - .01;//z,A
+
+			//vertex 2
+			vertexPositions[i*12 + 3] = xoff + .03;//x
+			vertexPositions[i*12 + 4] = yoff + .97;//y
+			vertexPositions[i*12 + 5] = zoff - .01;//B
+
+			//vertex 3
+			vertexPositions[i*12 + 6] = xoff + .97;//x
+			vertexPositions[i*12 + 7] = yoff + .03;//y
+			vertexPositions[i*12 + 8] = zoff - .01;//z,C
+
+			//vertex 4
+			vertexPositions[i*12 + 9] = xoff + .97;//x
+			vertexPositions[i*12 + 10] = yoff + .97;//y
+			vertexPositions[i*12 + 11] = zoff - .01;//z,A
+
+			normals[i*12 + 0] = 0;
+			normals[i*12 + 1] = 0;
+			normals[i*12 + 2] = -1;
+			normals[i*12 + 3] = 0;
+			normals[i*12 + 4] = 0;
+			normals[i*12 + 5] = -1;
+			normals[i*12 + 6] = 0;
+			normals[i*12 + 7] = 0;
+			normals[i*12 + 8] = -1;
+			normals[i*12 + 9] = 0;
+			normals[i*12 + 10] = 0;
+			normals[i*12 + 11] = -1;
+
+			indexdata[i*6 + 0] = 0 + i*4;
+			indexdata[i*6+ 1] = 1 + i*4;
+			indexdata[i*6+ 2] = 2 + i*4;
+			indexdata[i*6+ 3] = 1 + i*4;
+			indexdata[i*6+ 4] = 2 + i*4;
+			indexdata[i*6+ 5] = 3 + i*4;
+
+			float color = randColor();
+			wind_colors[i*4] = color;
+			wind_colors[i*4+1] = color;
+			wind_colors[i*4+2] = color;
+			wind_colors[i*4+3] = color;
+		} 
+		
+		for(int i = num_windows; i < num_windows*2; i++){
+			//back
+			int j = i % num_windows;
+			//x offset relative to the center of the building
+			float xoff,yoff,zoff;
+			if(i%num_windows < start_top){
+				xoff = -building_width/2 + 1.0 * (i%((int)building_width));
+				yoff = -height/2 + j/((int)building_width);
+				zoff = building_width/2;
+			}else{
+				xoff = -top_width/2 + 1.0 * (i%((int)top_width));
+				j = j - start_top;
+				yoff = -height/2 + bottom_height + j/((int)top_width);
+				zoff = top_width/2;
+			}
+			//vertex 1
+			vertexPositions[i*12 + 0] = xoff + .03;//x
+			vertexPositions[i*12 + 1] = yoff + .03;//y
+			vertexPositions[i*12 + 2] = zoff + .01;//z,A
+
+			//vertex 2
+			vertexPositions[i*12 + 3] = xoff + .03;//x
+			vertexPositions[i*12 + 4] = yoff + .97;//y
+			vertexPositions[i*12 + 5] = zoff + .01;//B
+
+			//vertex 3
+			vertexPositions[i*12 + 6] = xoff + .97;//x
+			vertexPositions[i*12 + 7] = yoff + .03;//y
+			vertexPositions[i*12 + 8] = zoff + .01;//z,C
+
+			//vertex 4
+			vertexPositions[i*12 + 9] = xoff + .97;//x
+			vertexPositions[i*12 + 10] = yoff + .97;//y
+			vertexPositions[i*12 + 11] = zoff + .01;//z,A
+
+			normals[i*12+ 0] = 0;
+			normals[i*12+ 1] = 0;
+			normals[i*12+ 2] = 1;
+			normals[i*12+ 3] = 0;
+			normals[i*12+ 4] = 0;
+			normals[i*12+ 5] = 1;
+			normals[i*12+ 6] = 0;
+			normals[i*12+ 7] = 0;
+			normals[i*12+ 8] = 1;
+			normals[i*12+ 9] = 0;
+			normals[i*12+ 10] = 0;
+			normals[i*12+ 11] = 1;
+
+			indexdata[i*6 + 0] = 0 + i*4;
+			indexdata[i*6+ 1] = 1 + i*4;
+			indexdata[i*6+ 2] = 2 + i*4;
+			indexdata[i*6+ 3] = 1 + i*4;
+			indexdata[i*6+ 4] = 2 + i*4;
+			indexdata[i*6+ 5] = 3 + i*4;
+
+			float color = randColor();
+			wind_colors[i*4] = color;
+			wind_colors[i*4+1] = color;
+			wind_colors[i*4+2] = color;
+			wind_colors[i*4+3] = color;
+		} 
+
+		for(int i = num_windows*2; i < num_windows*3; i++){
+			//left
+			int j = i % num_windows;
+			float xoff,yoff,zoff;
+			if(i%num_windows < start_top){
+				xoff = -building_width/2;
+				yoff = -height/2 + j/((int)building_width);
+				zoff = -building_width/2 + 1.0 * (i%((int)building_width));
+			}else{
+				xoff = -top_width/2;
+				j = j - start_top;
+				yoff = -height/2 + bottom_height + j/((int)top_width);
+				zoff = -top_width/2 + 1.0 * (i%((int)top_width));
+			}
+			//vertex 1
+			vertexPositions[i*12 + 0] = xoff - .01;//x
+			vertexPositions[i*12 + 1] = yoff + .03;//y
+			vertexPositions[i*12 + 2] = zoff + .03;//z,A
+
+			//vertex 2
+			vertexPositions[i*12 + 3] = xoff - .01;//x
+			vertexPositions[i*12 + 4] = yoff + .97;//y
+			vertexPositions[i*12 + 5] = zoff + .03;//B
+
+			//vertex 3
+			vertexPositions[i*12 + 6] = xoff - .01;//x;
+			vertexPositions[i*12 + 7] = yoff + .03;//y
+			vertexPositions[i*12 + 8] = zoff + .97;//z,C
+
+			//vertex 4
+			vertexPositions[i*12 + 9] = xoff - .01;//x
+			vertexPositions[i*12 + 10] = yoff + .97;//y
+			vertexPositions[i*12 + 11] = zoff + .97;//z,A
+			
+			normals[i*12+ 0] = -1;
+			normals[i*12+ 1] = 0;
+			normals[i*12+ 2] = 0;
+			normals[i*12+ 3] = -1;
+			normals[i*12+ 4] = 0;
+			normals[i*12+ 5] = 0;
+			normals[i*12+ 6] = -1;
+			normals[i*12+ 7] = 0;
+			normals[i*12+ 8] = 0;
+			normals[i*12+ 9] = -1;
+			normals[i*12+ 10] = 0;
+			normals[i*12+ 11] = 0;
+
+			indexdata[i*6 + 0] = 0 + i*4;
+			indexdata[i*6+ 1] = 1 + i*4;
+			indexdata[i*6+ 2] = 2 + i*4;
+			indexdata[i*6+ 3] = 1 + i*4;
+			indexdata[i*6+ 4] = 2 + i*4;
+			indexdata[i*6+ 5] = 3 + i*4;
+
+			float color = randColor();
+			wind_colors[i*4] = color;
+			wind_colors[i*4+1] = color;
+			wind_colors[i*4+2] = color;
+			wind_colors[i*4+3] = color;
+		} 
+
+		for(int i = num_windows*3; i < num_windows*4; i++){
+			//right
+			int j = i % num_windows;
+			float xoff,yoff,zoff;
+			if(i%num_windows < start_top){
+				xoff = building_width/2;
+				yoff = -height/2 + j/((int)building_width);
+				zoff = -building_width/2 + 1.0 * (i%((int)building_width));
+			}else{
+				xoff = top_width/2;
+				j = j - start_top;
+				yoff = -height/2 + bottom_height + j/((int)top_width);
+				zoff = -top_width/2 + 1.0 * (i%((int)top_width));
+			}
+			//vertex 1
+			vertexPositions[i*12 + 0] = xoff + .01;//x
+			vertexPositions[i*12 + 1] = yoff + .03;//y
+			vertexPositions[i*12 + 2] = zoff + .03;//z,A
+
+			//vertex 2
+			vertexPositions[i*12 + 3] = xoff + .01;//x
+			vertexPositions[i*12 + 4] = yoff + .97;//y
+			vertexPositions[i*12 + 5] = zoff + .03;//B
+
+			//vertex 3
+			vertexPositions[i*12 + 6] = xoff + .01;//x;
+			vertexPositions[i*12 + 7] = yoff + .03;//y
+			vertexPositions[i*12 + 8] = zoff + .97;//z,C
+
+			//vertex 4
+			vertexPositions[i*12 + 9] = xoff + .01;//x
+			vertexPositions[i*12 + 10] = yoff + .97;//y
+			vertexPositions[i*12 + 11] = zoff + .97;//z,A
+			
+			normals[i*12+ 0] = 1;
+			normals[i*12+ 1] = 0;
+			normals[i*12+ 2] = 0;
+			normals[i*12+ 3] = 1;
+			normals[i*12+ 4] = 0;
+			normals[i*12+ 5] = 0;
+			normals[i*12+ 6] = 1;
+			normals[i*12+ 7] = 0;
+			normals[i*12+ 8] = 0;
+			normals[i*12+ 9] = 1;
+			normals[i*12+ 10] = 0;
+			normals[i*12+ 11] = 0;
+
+			indexdata[i*6 + 0] = 0 + i*4;
+			indexdata[i*6+ 1] = 1 + i*4;
+			indexdata[i*6+ 2] = 2 + i*4;
+			indexdata[i*6+ 3] = 1 + i*4;
+			indexdata[i*6+ 4] = 2 + i*4;
+			indexdata[i*6+ 5] = 3 + i*4;
+
+			float color = randColor();
+			wind_colors[i*4] = color;
+			wind_colors[i*4+1] = color;
+			wind_colors[i*4+2] = color;
+			wind_colors[i*4+3] = color;
+		} 
+		//YAY!!!!
+		kuhl_geometry_attrib(&(output->quads[1]),vertexPositions,3,"in_Position",KG_WARN);
+		kuhl_geometry_attrib(&(output->quads[1]),normals,3,"in_Normal",KG_WARN);
+		kuhl_geometry_indices(&(output->quads[1]), indexdata, num_windows * 4 * 3 * 2);
+		kuhl_geometry_attrib(&(output->quads[1]), wind_colors,1 ,"color", KG_WARN);
+	}
+
+	output->modelMat = (float*)malloc(sizeof(float) * 16);
+	float y_offset = output->height/2;
+	mat4f_translate_new(output->modelMat,x,y_offset + 1,z);
+	return output;
+}
+
 Block* generateBlock(float x, float y, float z){
 	int type = 0;//will detirmine the contents of the block (range 0-15)
 	srand(x*y + y);
-	type = type % 16;
+	
 	Block* output = malloc(sizeof(Block));
 	output->buildings = (Building**)malloc(sizeof(Building*)*4);
 	glUseProgram(0);
@@ -1073,39 +1581,43 @@ Block* generateBlock(float x, float y, float z){
 	float z_shift = building_width * .75;
 	float y_shift = y;
 	//building on the far left
-	if(type >= 1 ){
+	type = rand() % 2;
+	if(type == 0){
 		//generate simple building
 		output->buildings[0] = generateSmallBuilding(program, -x_shift, y_shift, -z_shift);
 	}else{
 		//generate complex building
-		output->buildings[0] = generateSmallBuilding(program, -x_shift, y_shift, -z_shift);
+		output->buildings[0] = generateComplexBuilding(program, -x_shift, y_shift, -z_shift);
 	}
-
+	
 	//far right
-	if(type >= 3){
+	type = rand() % 2;
+	if(type == 0){
 		//generate simple building
 		output->buildings[1] = generateSmallBuilding(program, x_shift, y_shift, -z_shift);
 	}else{
 		//generate complex building
-		output->buildings[1] = generateSmallBuilding(program, x_shift, y_shift, -z_shift);
+		output->buildings[1] = generateComplexBuilding(program, x_shift, y_shift, -z_shift);
 	}
 
 	//close left
-	if(type >= 7){
+	type = rand() % 2;
+	if(type == 0){
 		//generate simple building
 		output->buildings[2] = generateSmallBuilding(program, -x_shift, y_shift, z_shift);
 	}else{
 		//generate complex building
-		output->buildings[2] = generateSmallBuilding(program, -x_shift, y_shift, z_shift);
+		output->buildings[2] = generateComplexBuilding(program, -x_shift, y_shift, z_shift);
 	}
-
+	
 	//close right
-	if(type>= 15){
+	type = rand() % 2;
+	if(type == 0){
 		//generate simple building
 		output->buildings[3] = generateSmallBuilding(program, x_shift, y_shift, z_shift);
 	}else{
 		//generate complex building
-		output->buildings[3] = generateSmallBuilding(program, x_shift, y_shift, z_shift);
+		output->buildings[3] = generateComplexBuilding(program, x_shift, y_shift, z_shift);
 	}
 
 	output->modelMat = (float*)malloc(sizeof(float) * 16);
