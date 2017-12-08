@@ -76,8 +76,8 @@ float randColor();
 
 
 //global variables
-//static float min_height = 1.0;
-//static float max_height = 10.0;
+static float min_height = 1.0;
+static float max_height = 15.0;
 static float building_width = 5.0;
 static Block* map[9];
 static int max_blocks = 9;//should be a square number (i.e 1,4,9,16,25...)
@@ -320,8 +320,8 @@ void updateViewer(){
 		you.translate[i] += scalar * look_vec[i];
 	}
 	you.translate[1] += ym_speed * time_diff * dirs[3];
-	if(you.translate[1] < 0){
-		you.translate[1] = 0;
+	if(you.translate[1] < -5){
+		you.translate[1] = -5;
 	}
 
 	if(you.translate[1] > 50){
@@ -607,7 +607,10 @@ void drawBlock(Block* object, float* viewMat, float* perspective){
 Building* generateSmallBuilding(GLuint prog, float x, float y, float z){
 	Building* output = (Building*)malloc(sizeof(Building));
 	output->width = building_width;
-	output->height = 10;
+	output->height = (float)(rand() % (int)max_height);
+	if(output->height < min_height){
+		output->height = min_height;
+	}
 	
 	//the 1 is the base building, the width and height detirmine the number
 	//of windows on the building and there are 4 sides of the building that
@@ -989,7 +992,8 @@ Building* generateSmallBuilding(GLuint prog, float x, float y, float z){
 	}
 
 	output->modelMat = (float*)malloc(sizeof(float) * 16);
-	mat4f_translate_new(output->modelMat,x,y + 1,z);
+	float y_offset = output->height/2;
+	mat4f_translate_new(output->modelMat,x,y_offset + 1,z);
 	return output;
 }
 
@@ -1067,7 +1071,7 @@ Block* generateBlock(float x, float y, float z){
 	//code to make the buildings
 	float x_shift = building_width * .75;
 	float z_shift = building_width * .75;
-	float y_shift = 5;
+	float y_shift = y;
 	//building on the far left
 	if(type >= 1 ){
 		//generate simple building
