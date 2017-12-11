@@ -18,6 +18,8 @@
 
 #include "libkuhl.h"
 
+#define TURNIN
+
 static GLuint program = 0;
 static GLuint road_prog = 0; /**< id value for the GLSL program */
 static GLuint duck_prog = 0;
@@ -97,6 +99,7 @@ static kuhl_geometry* duck;
 void keyboard(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
 	if(action == GLFW_PRESS){
+		#ifndef TURNIN
 		switch(key)
 		{
 			//takes a normalized look vector and multiplies it by a unit of time (only on the x,z plane)
@@ -142,9 +145,29 @@ void keyboard(GLFWwindow* window, int key, int scancode, int action, int mods)
 				glfwSetWindowShouldClose(window, GL_TRUE);
 				break;
 		}
+		#endif
+		#ifdef TURNIN
+		switch(key){
+			//takes a normalized look vector and multiplies it by a unit of time (only on the x,z plane)
+			//adds result to the position to get the new position
+			case GLFW_KEY_B:
+				dirs[0] = -1;
+				break;
+
+			case GLFW_KEY_SPACE:
+				dirs[0] = 1;
+				break;
+
+			case GLFW_KEY_ESCAPE:
+				glfwSetWindowShouldClose(window, GL_TRUE);
+				break;
+		}
+		#endif
+
 	}
 
 	if(action == GLFW_RELEASE){
+		#ifndef TURNIN
 		switch(key)
 		{
 			//takes a normalized look vector and multiplies it by a unit of time (only on the x,z plane)
@@ -203,6 +226,26 @@ void keyboard(GLFWwindow* window, int key, int scancode, int action, int mods)
 				break;
 
 		}
+		#endif
+		#ifdef TURNIN
+		switch(key){
+			//takes a normalized look vector and multiplies it by a unit of time (only on the x,z plane)
+			//adds result to the position to get the new position
+			case GLFW_KEY_B:
+				if(dirs[0] == -1)
+					dirs[0] = 0;
+				break;
+
+			case GLFW_KEY_SPACE:
+				if(dirs[0] == 1)
+					dirs[0] = 0;
+				break;
+
+			case GLFW_KEY_ESCAPE:
+				glfwSetWindowShouldClose(window, GL_TRUE);
+				break;
+		}
+		#endif
 	}
 }
 
@@ -260,7 +303,11 @@ void display()
 		
 		mat4f_scale_new(temp, .5, .5, .5);
 		mat4f_mult_mat4f_new(duck_modelview, temp, duck_modelview);
-		mat4f_translate_new(temp, you.translate[0], you.translate[1] - 1, you.translate[2]);
+		mat4f_translate_new(
+			temp, 
+			you.translate[0] + you.start_char[0], 
+			you.translate[1] - 1  + you.start_char[1], 
+			you.translate[2]  + you.start_char[2]);
 		mat4f_mult_mat4f_new(duck_modelview, temp, duck_modelview);
 		mat4f_mult_mat4f_new(duck_modelview, viewMat, duck_modelview);
 		glUniformMatrix4fv(kuhl_get_uniform("Projection"),
@@ -353,8 +400,8 @@ void updateViewer(){
 		you.translate[i] += scalar * look_vec[i];
 	}
 	you.translate[1] += ym_speed * time_diff * dirs[3];
-	if(you.translate[1] < -5){
-		you.translate[1] = -5;
+	if(you.translate[1] < 0){
+		you.translate[1] = 0;
 	}
 
 	if(you.translate[1] > 50){
@@ -1053,7 +1100,7 @@ Building* generateComplexBuilding(GLuint prog, float x, float y, float z){
 	if(output->height < min_height){
 		output->height = min_height;
 	}
-	float bottom_height = output->height/2 + (int)(output->height)%2;
+	float bottom_height = (int)output->height/2 + (int)(output->height)%2;
 	float top_height = output->height/2;
 	float top_width = (int)(building_width)/2 + 1;
 	
@@ -1070,7 +1117,8 @@ Building* generateComplexBuilding(GLuint prog, float x, float y, float z){
 		kuhl_geometry_new(&(output->quads[0]),prog,48,GL_TRIANGLES);
 
 		float height = output->height;
-
+		
+		float start_top = -output->height/2 + bottom_height;
 		//sets the verticies for a rectangular prism with a square base and
 		//a variable height
 		//centered on the origin
@@ -1078,21 +1126,21 @@ Building* generateComplexBuilding(GLuint prog, float x, float y, float z){
 
 			//front
 			-building_width/2,-output->height/2,				-building_width/2,//A
-			-building_width/2,-output->height/2 + bottom_height,-building_width/2,//B
+			-building_width/2,start_top,-building_width/2,//B
 			building_width/2,-output->height/2,					-building_width/2,//C
-			building_width/2,-output->height/2 + bottom_height,	-building_width/2,//D
+			building_width/2,start_top,	-building_width/2,//D
 			
 			//back
 			-building_width/2,-output->height/2,building_width/2,//E
-			-building_width/2,-output->height/2 + bottom_height,building_width/2,//F
+			-building_width/2,start_top,building_width/2,//F
 			building_width/2,-output->height/2,building_width/2,//G
-			building_width/2,-output->height/2 + bottom_height,building_width/2,//H
+			building_width/2,start_top,building_width/2,//H
 			
 			//top
-			-building_width/2,-output->height/2 + bottom_height,-building_width/2,//B
-			-building_width/2,-output->height/2 + bottom_height,building_width/2,//F
-			building_width/2,-output->height/2 + bottom_height,-building_width/2,//D
-			building_width/2,-output->height/2 + bottom_height,building_width/2,//H
+			-building_width/2,start_top,-building_width/2,//B
+			-building_width/2,start_top,building_width/2,//F
+			building_width/2,start_top,-building_width/2,//D
+			building_width/2,start_top,building_width/2,//H
 			
 
 			//bottom
@@ -1104,14 +1152,14 @@ Building* generateComplexBuilding(GLuint prog, float x, float y, float z){
 			//left
 			-building_width/2,-output->height/2,-building_width/2,//A
 			-building_width/2,-output->height/2,building_width/2,//E
-			-building_width/2,-output->height/2 + bottom_height,-building_width/2,//B
-			-building_width/2,-output->height/2 + bottom_height,building_width/2,//F
+			-building_width/2,start_top,-building_width/2,//B
+			-building_width/2,start_top,building_width/2,//F
 
 			//right
 			building_width/2,-output->height/2,-building_width/2,//C
 			building_width/2,-output->height/2,building_width/2,//G
-			building_width/2,-output->height/2 + bottom_height,-building_width/2,//D
-			building_width/2,-output->height/2 + bottom_height,building_width/2,//H
+			building_width/2,start_top,-building_width/2,//D
+			building_width/2,start_top,building_width/2,//H
 			
 
 
@@ -1119,15 +1167,15 @@ Building* generateComplexBuilding(GLuint prog, float x, float y, float z){
 
 
 			//front
-			-top_width/2,output->height/2 - top_height,	-top_width/2,//A
+			-top_width/2,start_top,	-top_width/2,//A
 			-top_width/2,output->height/2,				-top_width/2,//B
-			top_width/2,output->height/2 - top_height,	-top_width/2,//C
+			top_width/2,start_top,	-top_width/2,//C
 			top_width/2,output->height/2,				-top_width/2,//D
 			
 			//back
-			-top_width/2,output->height/2 - top_height,top_width/2,//E
+			-top_width/2,start_top,top_width/2,//E
 			-top_width/2,output->height/2,top_width/2,//F
-			top_width/2,output->height/2 - top_height,top_width/2,//G
+			top_width/2,start_top,top_width/2,//G
 			top_width/2,output->height/2,top_width/2,//H
 			
 			//top
@@ -1138,20 +1186,20 @@ Building* generateComplexBuilding(GLuint prog, float x, float y, float z){
 			
 
 			//bottom
-			-top_width/2,output->height/2 - top_height,-top_width/2,//A
-			-top_width/2,output->height/2 - top_height,top_width/2,//E
-			top_width/2,output->height/2 - top_height,-top_width/2,//C
-			top_width/2,output->height/2 - top_height,top_width/2,//G
+			-top_width/2,start_top,-top_width/2,//A
+			-top_width/2,start_top,top_width/2,//E
+			top_width/2,start_top,-top_width/2,//C
+			top_width/2,start_top,top_width/2,//G
 
 			//left
-			-top_width/2,output->height/2 - top_height,-top_width/2,//A
-			-top_width/2,output->height/2 - top_height,top_width/2,//E
+			-top_width/2,start_top,-top_width/2,//A
+			-top_width/2,start_top,top_width/2,//E
 			-top_width/2,output->height/2,-top_width/2,//B
 			-top_width/2,output->height/2,top_width/2,//F
 
 			//right
-			top_width/2,output->height/2 - top_height,-top_width/2,//C
-			top_width/2,output->height/2 - top_height,top_width/2,//G
+			top_width/2,start_top,-top_width/2,//C
+			top_width/2,start_top,top_width/2,//G
 			top_width/2,output->height/2,-top_width/2,//D
 			top_width/2,output->height/2,top_width/2,//H
 			
@@ -1264,8 +1312,6 @@ Building* generateComplexBuilding(GLuint prog, float x, float y, float z){
 	
 	{
 		//window code
-		//puts windows on the back of the building
-		//set the windows
 		int num_windows = output->width * bottom_height + top_width * top_height;//num windows per side
 		int num_verts = num_windows * 4 * 4;//number of windows * num_sides * num_verts/window
 		float height = output->height;
@@ -1289,21 +1335,26 @@ Building* generateComplexBuilding(GLuint prog, float x, float y, float z){
 
 		int start_top = output->width * bottom_height;
 
+
 		for(int i = 0; i < num_windows; i++){
 			//front 
 			int j = i % num_windows;
-			//x offset relative to the center of the building
+			int t_height = j / (int)building_width; //temp variable
 			float xoff,yoff,zoff;
-			if(i < start_top){
+			if(t_height < bottom_height){
 				xoff = -building_width/2 + 1.0 * (i%((int)building_width));
-				yoff = -height/2 + j/((int)building_width);
+				yoff = (-height/2 + j/((int)building_width));
 				zoff = -building_width/2;
 			}else{
 				xoff = -top_width/2 + 1.0 * (i%((int)top_width));
 				j = j - start_top;
-				yoff = -height/2 + bottom_height + j/((int)top_width);
+				yoff = (-height/2 + bottom_height + j/((int)top_width));
+				if(yoff >= height/2){
+					break;
+				}
 				zoff = -top_width/2;
 			}
+				
 			//vertex 1
 			vertexPositions[i*12 + 0] = xoff + .03;//x
 			vertexPositions[i*12 + 1] = yoff + .03;//y
@@ -1354,16 +1405,19 @@ Building* generateComplexBuilding(GLuint prog, float x, float y, float z){
 		for(int i = num_windows; i < num_windows*2; i++){
 			//back
 			int j = i % num_windows;
-			//x offset relative to the center of the building
+			int t_height = j / (int)building_width; //temp variable
 			float xoff,yoff,zoff;
-			if(i%num_windows < start_top){
+			if(t_height < bottom_height){
 				xoff = -building_width/2 + 1.0 * (i%((int)building_width));
-				yoff = -height/2 + j/((int)building_width);
+				yoff = (-height/2 + j/((int)building_width));
 				zoff = building_width/2;
 			}else{
 				xoff = -top_width/2 + 1.0 * (i%((int)top_width));
 				j = j - start_top;
-				yoff = -height/2 + bottom_height + j/((int)top_width);
+				yoff = (-height/2 + bottom_height + j/((int)top_width));
+				if(yoff >= height/2){
+					break;
+				}
 				zoff = top_width/2;
 			}
 			//vertex 1
@@ -1416,15 +1470,19 @@ Building* generateComplexBuilding(GLuint prog, float x, float y, float z){
 		for(int i = num_windows*2; i < num_windows*3; i++){
 			//left
 			int j = i % num_windows;
+			int t_height = j / (int)building_width; //temp variable
 			float xoff,yoff,zoff;
-			if(i%num_windows < start_top){
+			if(t_height < bottom_height){
 				xoff = -building_width/2;
-				yoff = -height/2 + j/((int)building_width);
+				yoff = (-height/2 + j/((int)building_width));
 				zoff = -building_width/2 + 1.0 * (i%((int)building_width));
 			}else{
 				xoff = -top_width/2;
 				j = j - start_top;
-				yoff = -height/2 + bottom_height + j/((int)top_width);
+				yoff = (-height/2 + bottom_height + j/((int)top_width));
+				if(yoff >= height/2){
+					break;
+				}
 				zoff = -top_width/2 + 1.0 * (i%((int)top_width));
 			}
 			//vertex 1
@@ -1477,15 +1535,19 @@ Building* generateComplexBuilding(GLuint prog, float x, float y, float z){
 		for(int i = num_windows*3; i < num_windows*4; i++){
 			//right
 			int j = i % num_windows;
+			int t_height = j / (int)building_width; //temp variable
 			float xoff,yoff,zoff;
-			if(i%num_windows < start_top){
+			if(t_height < bottom_height){
 				xoff = building_width/2;
-				yoff = -height/2 + j/((int)building_width);
+				yoff = (-height/2 + j/((int)building_width));
 				zoff = -building_width/2 + 1.0 * (i%((int)building_width));
 			}else{
 				xoff = top_width/2;
 				j = j - start_top;
-				yoff = -height/2 + bottom_height + j/((int)top_width);
+				yoff = (-height/2 + bottom_height + j/((int)top_width));
+				if(yoff >= height/2){
+					break;
+				}
 				zoff = -top_width/2 + 1.0 * (i%((int)top_width));
 			}
 			//vertex 1
@@ -1757,6 +1819,7 @@ int main(int argc, char** argv)
 	printf("Init Complete\n");
 	dgr_init();     /* Initialize DGR based on environment variables. */
 
+	#ifndef TURNIN
 	you.yangle = 0;
 	you.xangle = 0;
 	you.start_pos[0] = 0;
@@ -1768,13 +1831,34 @@ int main(int argc, char** argv)
 	you.start_char[0] = 0;
 	you.start_char[1] = 0;
 	you.start_char[2] = 0;
+	#endif
+	#ifdef TURNIN
+	you.yangle = 0;
+	you.xangle = 0;
+	you.start_pos[0] = 0;
+	you.start_pos[1] = 20;
+	you.start_pos[2] = -1.5;
+	you.start_look[0] = 0;
+	you.start_look[1] = 10;
+	you.start_look[2] = 10;
+	you.start_char[0] = 0;
+	you.start_char[1] = 18;
+	you.start_char[2] = 0;
+	#endif
 	
 	for(int i = 0; i<4; i++)
 		dirs[i] = 0;
 	
+	#ifndef TURNIN
 	float initCamPos[3]  = {0,0,10}; // location of camera
 	float initCamLook[3] = {0,0,-1}; // a point the camera is facing at
 	float initCamUp[3]   = {0,1,0}; // a vector indicating which direction is up
+	#endif
+	#ifdef TURNIN
+	float initCamPos[3]  = {0,20,10}; // location of camera
+	float initCamLook[3] = {0,10,-1}; // a point the camera is facing at
+	float initCamUp[3]   = {0,1,0}; // a vector indicating which direction is up
+	#endif
 	last_frame = glfwGetTime();
 	viewmat_init(initCamPos, initCamLook, initCamUp);
 	
